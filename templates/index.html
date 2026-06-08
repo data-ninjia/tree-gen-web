@@ -11,7 +11,9 @@
     .topbar-title { font-size: 14px; font-weight: 500; }
     .topbar-file { font-size: 11px; color: #666; background: #f5f5f3; padding: 3px 8px; border-radius: 6px; border: 1px solid #e5e5e5; }
     .btn { font-size: 12px; padding: 5px 12px; border-radius: 8px; border: 1px solid #ccc; background: transparent; cursor: pointer; color: #1a1a1a; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: #2C5F8A; color: #fff; border-color: #2C5F8A; }
+    .btn-primary:disabled { background: #2C5F8A; }
 
     .app { display: grid; grid-template-columns: 220px 1fr; height: calc(100vh - 48px); }
 
@@ -73,7 +75,7 @@
   <span class="topbar-file" id="topbar-file" style="display:none"></span>
   <div style="margin-left:auto;display:flex;gap:8px">
     <button class="btn" onclick="resetUpload()">Upload new</button>
-    <button class="btn btn-primary" id="btn-generate" style="display:none">Generate PDF</button>
+    <button class="btn btn-primary" id="btn-generate" style="display:none" onclick="generatePdf()">Generate PDF</button>
   </div>
 </div>
 
@@ -239,6 +241,31 @@
         </table>
       </div>
     `;
+  }
+
+  async function generatePdf() {
+    const btn = document.getElementById('btn-generate');
+    btn.textContent = 'Generating...';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('/generate', { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Generation failed');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'structure_tree.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      btn.textContent = 'Generate PDF';
+      btn.disabled = false;
+    }
   }
 
   function resetUpload() {
