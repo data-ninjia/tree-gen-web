@@ -7,7 +7,7 @@ from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.lib.colors import white, black, HexColor
 
 import config as cfg
-from core.data_models import F0Group, F1Section, F1Leaf
+from core.data_models import MainSystem, System, Subsystem
 from utils.pdf_primitives import (
     line,
     bookmark,
@@ -26,19 +26,19 @@ from utils.pdf_primitives import (
 
 def draw_tree_pages(
     c: rl_canvas.Canvas,
-    group: F0Group,
+    group: MainSystem,
     first_page: int,
     overview_page: int,
     total_pages: int,
     col_labels: dict,
 ) -> int:
     """
-    Draw all F1 tree pages for one F0Group onto canvas c.
+    Draw all tree pages for one MainSystem onto canvas c.
     Calls c.showPage() between pages, NOT after the last one.
     Returns number of pages drawn.
     """
-    h_chunks = _chunk_sections(group.f1_sections, cfg.MAX_COLS_PER_PAGE)
-    pages, section_pages = _plan_all_pages(h_chunks)
+    h_chunks = _chunk_systems(group.systems, cfg.MAX_COLS_PER_PAGE)
+    pages, system_pages = _plan_all_pages(h_chunks)
     n_pages = len(pages)
 
     for page_i, page_spec in enumerate(pages):
@@ -58,7 +58,7 @@ def draw_tree_pages(
             n_pages,
             total_pages,
             col_labels,
-            section_pages=section_pages,
+            system_pages=system_pages,
             first_page=first_page,
         )
 
@@ -76,10 +76,10 @@ def draw_tree_pages(
 class _ColSpec:
     """What to render in one column on one page."""
 
-    def __init__(self, section: F1Section, leaf_offset: int, leaf_count: int):
-        self.section = section
-        self.leaf_offset = leaf_offset
-        self.leaf_count = leaf_count
+    def __init__(self, system: System, subsystem_offset: int, subsystem_count: int):
+        self.system = system
+        self.subsystem_offset = subsystem_offset
+        self.subsystem_count = subsystem_count
 
 
 class _PageSpec:
@@ -95,8 +95,8 @@ class _PageSpec:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def _leaves_per_col() -> int:
-    """How many leaves fit vertically in one column."""
+def _subsystems_per_col() -> int:
+    """How many Subsystems fit vertically in one column."""
     f0_area = cfg.F0_H + 40
     l1_area = cfg.L1_H + 30
     avail = cfg.USABLE_TOP - cfg.USABLE_BOT - f0_area - l1_area - 20
@@ -104,41 +104,41 @@ def _leaves_per_col() -> int:
 
 
 def _plan_all_pages(
-    h_chunks: list[list[F1Section]],
+    h_chunks: list[list[System]],
 ) -> tuple[list[_PageSpec], dict[int, list[int]]]:
     """
     For each horizontal chunk:
-    - Page 1: all columns, each showing first N leaves
+    - Page 1: all columns, each showing first N subsystems
     - Continuation pages: only overflowing columns, shared per batch
 
     Returns:
-        pages           : list of _PageSpec
-        section_pages   : maps id(section) -> [page_indices] where it appears
+        pages        : list of _PageSpec
+        system_pages : maps id(system) -> [page_indices] where it appears
     """
     pages: list[_PageSpec] = []
-    section_pages: dict[int, list[int]] = {}
-    capacity = _leaves_per_col()
+    system_pages: dict[int, list[int]] = {}
+    capacity = _subsystems_per_col()
 
     for chunk in h_chunks:
-        # First page — all columns, first N leaves each
+        # First page — all columns, first N subsystems each
         first_specs = [
-            _ColSpec(sec, 0, min(capacity, len(sec.leaves))) for sec in chunk
+            _ColSpec(sys, 0, min(capacity, len(sys.subsystems))) for sys in chunk
         ]
         page_i = len(pages)
         pages.append(_PageSpec(first_specs, is_continuation=False))
         for spec in first_specs:
-            section_pages.setdefault(id(spec.section), []).append(page_i)
+            system_pages.setdefault(id(spec.system), []).append(page_i)
 
-        # Track offsets per section
-        offsets = [min(capacity, len(sec.leaves)) for sec in chunk]
+        # Track offsets per system
+        offsets = [min(capacity, len(sys.subsystems)) for sys in chunk]
 
         while True:
             overflow_specs = []
-            for sec, off in zip(chunk, offsets):
-                remaining = len(sec.leaves) - off
+            for sys, off in zip(chunk, offsets):
+                remaining = len(sys.subsystems) - off
                 if remaining > 0:
                     show = min(capacity, remaining)
-                    overflow_specs.append(_ColSpec(sec, off, show))
+                    overflow_specs.append(_ColSpec(sys, off, show))
 
             if not overflow_specs:
                 break
@@ -146,17 +146,17 @@ def _plan_all_pages(
             page_i = len(pages)
             pages.append(_PageSpec(overflow_specs, is_continuation=True))
             for spec in overflow_specs:
-                section_pages.setdefault(id(spec.section), []).append(page_i)
+                system_pages.setdefault(id(spec.system), []).append(page_i)
 
             # Advance offsets for overflowing columns
             new_offsets = list(offsets)
-            for i, sec in enumerate(chunk):
+            for i, sys in enumerate(chunk):
                 for spec in overflow_specs:
-                    if spec.section is sec:
-                        new_offsets[i] = spec.leaf_offset + spec.leaf_count
+                    if spec.system is sys:
+                        new_offsets[i] = spec.subsystem_offset + spec.subsystem_count
             offsets = new_offsets
 
-    return pages, section_pages
+    return pages, system_pages
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -166,7 +166,7 @@ def _plan_all_pages(
 
 def _draw_page(
     c: rl_canvas.Canvas,
-    group: F0Group,
+    group: MainSystem,
     page_spec: _PageSpec,
     pg: int,
     overview_page: int,
@@ -176,7 +176,7 @@ def _draw_page(
     n_pages: int,
     total_pages: int,
     col_labels,
-    section_pages: dict[int, list[int]] | None = None,
+    system_pages: dict[int, list[int]] | None = None,
     first_page: int = 1,
 ) -> None:
 
@@ -196,11 +196,11 @@ def _draw_page(
     _draw_connectors(c, col_specs, geom)
 
     # nodes on top of connectors
-    _draw_f0_node(c, group, geom, overview_page)
+    _draw_main_system_node(c, group, geom, overview_page)
     _draw_nav_badges(c, geom, prev_pg, next_pg, page_i, n_pages)
-    _draw_l1_nodes(c, col_specs, geom, section_pages=section_pages,
-                   page_i=page_i, first_page=first_page)
-    _draw_leaf_nodes(c, col_specs, geom)
+    _draw_system_nodes(c, col_specs, geom, system_pages=system_pages,
+                       page_i=page_i, first_page=first_page)
+    _draw_subsystem_nodes(c, col_specs, geom)
     _draw_legend(c, col_specs, group)
     _draw_level_legend(c, col_labels)
 
@@ -211,14 +211,14 @@ def _draw_page(
 
 
 def _draw_header(
-    c: rl_canvas.Canvas, group: F0Group, page_i: int, n_pages: int
+    c: rl_canvas.Canvas, group: MainSystem, page_i: int, n_pages: int
 ) -> None:
     c.setFillColor(cfg.COL_HEADER)
     c.rect(0, cfg.PAGE_H - cfg.HEADER_H, cfg.PAGE_W, cfg.HEADER_H, fill=1, stroke=0)
 
-    f0_display = group.code if group.code.startswith("=") else f"={group.code}"
+    code_display = group.code if group.code.startswith("=") else f"={group.code}"
     cont = f"  ({page_i + 1}/{n_pages})" if n_pages > 1 else ""
-    text = f"{f0_display}  —  {group.description}{cont}"
+    text = f"{code_display}  —  {group.description}{cont}"
 
     c.setFont(cfg.FONT_BOLD, cfg.TREE_HEADER_FS)
     c.setFillColor(white)
@@ -272,7 +272,7 @@ def _compute_geometry(n_cols: int) -> _Geom:
 def _draw_connectors(c: rl_canvas.Canvas, col_specs: list[_ColSpec], g: _Geom) -> None:
     n_cols = len(col_specs)
 
-    # F0 → bus
+    # MainSystem → bus
     line(c, g.f0_cx, g.f0_y, g.f0_cx, g.bus_y)
 
     # Horizontal bus across all columns
@@ -280,37 +280,31 @@ def _draw_connectors(c: rl_canvas.Canvas, col_specs: list[_ColSpec], g: _Geom) -
         line(c, g.col_xs[0], g.bus_y, g.col_xs[-1], g.bus_y)
 
     for spec, cx in zip(col_specs, g.col_xs):
-        leaves = spec.section.leaves[
-            spec.leaf_offset : spec.leaf_offset + spec.leaf_count
+        subsystems = spec.system.subsystems[
+            spec.subsystem_offset : spec.subsystem_offset + spec.subsystem_count
         ]
 
-        # Bus drop → L1 top
+        # Bus drop → System top
         line(c, cx, g.bus_y, cx, g.l1_top_y)
 
-        if not leaves:
+        if not subsystems:
             continue
 
-        n_leaves = len(leaves)
+        n_subs = len(subsystems)
 
-        # Spine x = left edge of L1 node + small indent
-        # This is the vertical line that runs down from L1
         leaf_nx = cx - g.leaf_nw / 2 + g.leaf_nw * 0.15
         spine_x = leaf_nx - 12
 
-        # Vertical spine from L1 bottom to midpoint of last leaf
-        last_top = g.leaf_top - (n_leaves - 1) * (cfg.LEAF_H + cfg.LEAF_GAP)
+        last_top = g.leaf_top - (n_subs - 1) * (cfg.LEAF_H + cfg.LEAF_GAP)
         last_mid = last_top - cfg.LEAF_H / 2
 
         line(c, cx, g.l1_y, spine_x, g.l1_y)
         line(c, spine_x, g.l1_y, spine_x, last_mid)
 
-        # Horizontal tick from spine to leaf left edge at each leaf midpoint
-        for ri in range(n_leaves):
+        for ri in range(n_subs):
             lt = g.leaf_top - ri * (cfg.LEAF_H + cfg.LEAF_GAP)
             lny = lt - cfg.LEAF_H
             lmid = lny + cfg.LEAF_H / 2
-
-            # Horizontal tick: spine → leaf left edge
             line(c, spine_x, lmid, leaf_nx, lmid)
 
 
@@ -319,17 +313,17 @@ def _draw_connectors(c: rl_canvas.Canvas, col_specs: list[_ColSpec], g: _Geom) -
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def _draw_f0_node(
-    c: rl_canvas.Canvas, group: F0Group, g: _Geom, overview_page: int
+def _draw_main_system_node(
+    c: rl_canvas.Canvas, group: MainSystem, g: _Geom, overview_page: int
 ) -> None:
-    f0_display = group.code if group.code.startswith("=") else f"={group.code}"
+    code_display = group.code if group.code.startswith("=") else f"={group.code}"
     node_box(
         c,
         x=g.f0_cx - cfg.F0_W / 2,
         y=g.f0_y,
         w=cfg.F0_W,
         h=cfg.F0_H,
-        code=f0_display,
+        code=code_display,
         description=group.description,
         code_fs=cfg.TREE_F0_CODE_FS,
         desc_fs=cfg.TREE_F0_DESC_FS,
@@ -355,18 +349,18 @@ def _draw_nav_badges(
         nav_badge(c, badge_y, f"{page_i + 2}/{n_pages} →", next_pg, align="right")
 
 
-def _draw_l1_nodes(
+def _draw_system_nodes(
     c: rl_canvas.Canvas,
     col_specs: list[_ColSpec],
     g: _Geom,
-    section_pages: dict[int, list[int]] | None = None,
+    system_pages: dict[int, list[int]] | None = None,
     page_i: int = 0,
     first_page: int = 1,
 ) -> None:
-    """L1 node always shown — it is an explicit row in Excel."""
+    """Draw System (F1 header) node for each column."""
     for spec, cx in zip(col_specs, g.col_xs):
-        sec = spec.section
-        label = f"={sec.label}" if not sec.label.startswith("=") else sec.label
+        sys = spec.system
+        label = f"={sys.label}" if not sys.label.startswith("=") else sys.label
         node_box(
             c,
             x=cx - g.node_w / 2,
@@ -374,7 +368,7 @@ def _draw_l1_nodes(
             w=g.node_w,
             h=cfg.L1_H,
             code=label,
-            description=sec.description,
+            description=sys.description,
             code_fs=cfg.TREE_L1_FS,
             desc_fs=cfg.TREE_LEAF_DESC_FS,
             fill=cfg.COL_L1_FILL,
@@ -382,57 +376,59 @@ def _draw_l1_nodes(
             border=black,
         )
 
-        # Section nav buttons — only if this section spans multiple pages
-        if section_pages is None:
+        # System nav buttons — only if this System spans multiple pages
+        if system_pages is None:
             continue
-        pages_for_sec = section_pages.get(id(sec), [])
-        if len(pages_for_sec) <= 1:
-            continue
-
-        pos_in_sec = pages_for_sec.index(page_i) if page_i in pages_for_sec else -1
-        if pos_in_sec < 0:
+        pages_for_sys = system_pages.get(id(sys), [])
+        if len(pages_for_sys) <= 1:
             continue
 
-        # "→ next" button below L1 node (if not last page of this section)
-        if pos_in_sec < len(pages_for_sec) - 1:
-            next_sec_page_i = pages_for_sec[pos_in_sec + 1]
-            target_pg = first_page + next_sec_page_i
-            n_sec = len(pages_for_sec)
+        pos_in_sys = pages_for_sys.index(page_i) if page_i in pages_for_sys else -1
+        if pos_in_sys < 0:
+            continue
+
+        n_sys = len(pages_for_sys)
+
+        # "cont. →" button below System node (if not last page of this System)
+        if pos_in_sys < n_sys - 1:
+            next_sys_page_i = pages_for_sys[pos_in_sys + 1]
+            target_pg = first_page + next_sys_page_i
             section_nav_button(
                 c, cx, g.l1_y,
-                label=f"cont. {pos_in_sec + 2}/{n_sec} →",
+                label=f"cont. {pos_in_sys + 2}/{n_sys} →",
                 target_page=target_pg,
                 direction="down",
             )
 
-        # "← prev" button above L1 node (if not first page of this section)
-        if pos_in_sec > 0:
-            prev_sec_page_i = pages_for_sec[pos_in_sec - 1]
-            target_pg = first_page + prev_sec_page_i
-            n_sec = len(pages_for_sec)
+        # "← back" button below System node (if not first page of this System)
+        if pos_in_sys > 0:
+            prev_sys_page_i = pages_for_sys[pos_in_sys - 1]
+            target_pg = first_page + prev_sys_page_i
             section_nav_button(
                 c, cx, g.l1_y,
-                label=f"← {pos_in_sec}/{n_sec} back",
+                label=f"← {pos_in_sys}/{n_sys} back",
                 target_page=target_pg,
                 direction="down",
             )
 
 
-def _draw_leaf_nodes(c: rl_canvas.Canvas, col_specs: list[_ColSpec], g: _Geom) -> None:
+def _draw_subsystem_nodes(
+    c: rl_canvas.Canvas, col_specs: list[_ColSpec], g: _Geom
+) -> None:
+    """Draw Subsystem (F1 code) nodes for each column."""
     for spec, cx in zip(col_specs, g.col_xs):
-        leaves = spec.section.leaves[
-            spec.leaf_offset : spec.leaf_offset + spec.leaf_count
+        subsystems = spec.system.subsystems[
+            spec.subsystem_offset : spec.subsystem_offset + spec.subsystem_count
         ]
 
-        # Leaf left edge — shifted right (same as connector calc)
         leaf_nx = cx - g.leaf_nw / 2 + g.leaf_nw * 0.15
 
-        for ri, leaf in enumerate(leaves):
+        for ri, sub in enumerate(subsystems):
             lt = g.leaf_top - ri * (cfg.LEAF_H + cfg.LEAF_GAP)
             lny = lt - cfg.LEAF_H
 
-            display = leaf.code + (" *" if not leaf.is_common else "")
-            border = cfg.COL_SPEC_BORDER if not leaf.is_common else black
+            display = sub.code + (" *" if not sub.is_common else "")
+            border = cfg.COL_SPEC_BORDER if not sub.is_common else black
 
             node_box(
                 c,
@@ -441,12 +437,12 @@ def _draw_leaf_nodes(c: rl_canvas.Canvas, col_specs: list[_ColSpec], g: _Geom) -
                 w=g.leaf_nw,
                 h=cfg.LEAF_H,
                 code=display,
-                description=leaf.description,
+                description=sub.description,
                 code_fs=cfg.TREE_LEAF_CODE_FS,
                 desc_fs=cfg.TREE_LEAF_DESC_FS,
                 border=border,
-                dashed=not leaf.is_common,
-                count=len(leaf.raw_codes),
+                dashed=not sub.is_common,
+                count=len(sub.raw_codes),
             )
 
 
@@ -456,34 +452,31 @@ def _draw_leaf_nodes(c: rl_canvas.Canvas, col_specs: list[_ColSpec], g: _Geom) -
 
 
 def _draw_legend(
-    c: rl_canvas.Canvas, col_specs: list[_ColSpec], group: F0Group
+    c: rl_canvas.Canvas, col_specs: list[_ColSpec], group: MainSystem
 ) -> None:
     """
-    Draw legend at bottom of page for specific (non-common) leaves.
-    Uses whichever list is shorter — present_in or absent_from —
-    to minimise text while keeping the format consistent:
+    Draw legend at bottom of page for exception (non-common) Subsystems.
+    Uses whichever list is shorter — present_in or absent_from:
       * =MQA21..29 — present in: G001..G003   (minority)
       * =MQA21..29 — absent in:  G005         (majority)
     """
     from core.excel_parser import _group_instances_ranges
 
-    # Collect all specific leaves from this page
-    specific: list[F1Leaf] = []
+    exception_subs: list[Subsystem] = []
     for spec in col_specs:
-        leaves = spec.section.leaves[
-            spec.leaf_offset : spec.leaf_offset + spec.leaf_count
+        subsystems = spec.system.subsystems[
+            spec.subsystem_offset : spec.subsystem_offset + spec.subsystem_count
         ]
-        for leaf in leaves:
-            if not leaf.is_common:
-                specific.append(leaf)
+        for sub in subsystems:
+            if not sub.is_common:
+                exception_subs.append(sub)
 
-    if not specific:
+    if not exception_subs:
         return
 
     total = group.count
     all_instances = set(group.instances)
 
-    # Draw legend box at bottom
     legend_x = cfg.USABLE_X
     legend_y = cfg.USABLE_BOT + 0.4 * 28.35
     line_h = 11.0
@@ -491,26 +484,24 @@ def _draw_legend(
 
     c.setFont(cfg.FONT_BOLD, fs)
     c.setFillColor(black)
-    c.drawString(legend_x, legend_y + (len(specific)) * line_h, "NOTES:")
+    c.drawString(legend_x, legend_y + len(exception_subs) * line_h, "NOTES:")
 
     c.setFont(cfg.FONT_REG, fs)
     c.setFillColor(HexColor("#555555"))
 
-    for i, leaf in enumerate(specific):
-        present = set(leaf.present_in)
+    for i, sub in enumerate(exception_subs):
+        present = set(sub.present_in)
         absent = sorted(all_instances - present)
 
         if len(present) > total / 2:
-            # Majority present → show the shorter absent list
             instances_str = _group_instances_ranges(absent) if absent else "—"
             label = "absent in"
         else:
-            # Minority present → show the shorter present list
             instances_str = _group_instances_ranges(sorted(present)) if present else "—"
             label = "present in"
 
-        text = f"{leaf.code} * — {label}: {instances_str}"
-        y = legend_y + (len(specific) - 1 - i) * line_h
+        text = f"{sub.code} * — {label}: {instances_str}"
+        y = legend_y + (len(exception_subs) - 1 - i) * line_h
         c.drawString(legend_x, y, text)
 
 
@@ -527,7 +518,6 @@ def _draw_level_legend(c: rl_canvas.Canvas, col_labels: dict) -> None:
     row_h = box_h + gap
     pad_x = 8.0
 
-    # Total legend block width — estimate
     legend_w = box_w + pad_x + 160.0
     legend_x = cfg.USABLE_X + cfg.USABLE_W - legend_w
     legend_y = cfg.USABLE_TOP - 10.0
@@ -535,13 +525,11 @@ def _draw_level_legend(c: rl_canvas.Canvas, col_labels: dict) -> None:
     for i, (fill, text_col, label) in enumerate(items):
         y = legend_y - i * row_h
 
-        # Coloured box
         c.setFillColor(fill)
         c.setStrokeColor(black)
         c.setLineWidth(0.7)
         c.roundRect(legend_x, y - box_h, box_w, box_h, cfg.NODE_R, fill=1, stroke=1)
 
-        # Label
         c.setFont(cfg.FONT_REG, fs)
         c.setFillColor(black)
         c.drawString(legend_x + box_w + pad_x, y - box_h + 4, label)
@@ -552,7 +540,7 @@ def _draw_level_legend(c: rl_canvas.Canvas, col_labels: dict) -> None:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def _chunk_sections(sections: list[F1Section], max_cols: int) -> list[list[F1Section]]:
-    if not sections:
+def _chunk_systems(systems: list[System], max_cols: int) -> list[list[System]]:
+    if not systems:
         return [[]]
-    return [sections[i : i + max_cols] for i in range(0, len(sections), max_cols)]
+    return [systems[i : i + max_cols] for i in range(0, len(systems), max_cols)]

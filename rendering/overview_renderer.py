@@ -5,13 +5,13 @@ from reportlab.lib.colors import HexColor, white, black
 from reportlab.lib.utils import simpleSplit
 
 import config as cfg
-from core.data_models import F0Group
+from core.data_models import MainSystem
 from utils.pdf_primitives import bookmark, link_rect, page_footer
 
 
 def draw_overview_pages(
     c: rl_canvas.Canvas,
-    groups: list[F0Group],
+    groups: list[MainSystem],
     page_nums: list[int],
     f1_first_pages: dict[str, int],
     total_pages: int,
@@ -38,7 +38,7 @@ def draw_overview_pages(
             c.showPage()
 
 
-def _split_into_pages(groups: list[F0Group]) -> list[list[F0Group]]:
+def _split_into_pages(groups: list[MainSystem]) -> list[list[MainSystem]]:
     return [
         groups[i : i + cfg.CARDS_PER_PAGE]
         for i in range(0, max(len(groups), 1), cfg.CARDS_PER_PAGE)
@@ -95,7 +95,7 @@ def _draw_title(c: rl_canvas.Canvas, page_i: int, total_ov_pages: int) -> None:
 
 def _draw_cards(
     c: rl_canvas.Canvas,
-    groups: list[F0Group],
+    groups: list[MainSystem],
     f1_first_pages: dict[str, int],
     page_num: int,
 ) -> None:
@@ -135,7 +135,7 @@ def _draw_single_card(
     card_w: float,
     card_h: float,
     card_r: float,
-    group: F0Group,
+    group: MainSystem,
     code_fs: float,
     desc_fs: float,
     cnt_fs: float,
