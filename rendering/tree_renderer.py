@@ -389,24 +389,32 @@ def _draw_system_nodes(
 
         n_sys = len(pages_for_sys)
 
-        # "cont. →" button below System node (if not last page of this System)
-        if pos_in_sys < n_sys - 1:
-            next_sys_page_i = pages_for_sys[pos_in_sys + 1]
-            target_pg = first_page + next_sys_page_i
-            section_nav_button(
-                c, cx, g.l1_y,
-                label=f"cont. {pos_in_sys + 2}/{n_sys} →",
-                target_page=target_pg,
-                direction="down",
-            )
-
-        # "← back" button below System node (if not first page of this System)
+        # "← back" button just above the first subsystem on this page
         if pos_in_sys > 0:
             prev_sys_page_i = pages_for_sys[pos_in_sys - 1]
             target_pg = first_page + prev_sys_page_i
+            # g.leaf_top is the top of the first subsystem box
             section_nav_button(
-                c, cx, g.l1_y,
+                c, cx, g.leaf_top,
                 label=f"← {pos_in_sys}/{n_sys} back",
+                target_page=target_pg,
+                direction="up",
+            )
+
+        # "cont. →" button below the last subsystem, centred on the column
+        if pos_in_sys < n_sys - 1:
+            next_sys_page_i = pages_for_sys[pos_in_sys + 1]
+            target_pg = first_page + next_sys_page_i
+            n_subs = spec.subsystem_count
+            last_sub_bottom = (
+                g.leaf_top
+                - (n_subs - 1) * (cfg.LEAF_H + cfg.LEAF_GAP)
+                - cfg.LEAF_H
+            )
+            # Centre on the column centre (cx), not the leaf left edge
+            section_nav_button(
+                c, cx, last_sub_bottom,
+                label=f"cont. {pos_in_sys + 2}/{n_sys} →",
                 target_page=target_pg,
                 direction="down",
             )
