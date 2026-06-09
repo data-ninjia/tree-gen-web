@@ -42,13 +42,8 @@ class ValidationResult:
 
 
 def validate(excel_path: str) -> ValidationResult:
-    """
-    Validate the input Excel file against INPUT_REQUIREMENTS.md rules.
-    Returns a ValidationResult — check .ok before proceeding.
-    """
     result = ValidationResult()
 
-    # ── Load ──────────────────────────────────────────────────────────────
     try:
         df = pd.read_excel(excel_path, dtype=str)
     except Exception as e:
@@ -80,7 +75,7 @@ def validate(excel_path: str) -> ValidationResult:
         )
 
     if not result.ok:
-        return result  # can't proceed without columns
+        return result
 
     # ── 2. At least one data row ──────────────────────────────────────────
     data_rows = df[df[f0_col] != ""]
@@ -88,7 +83,7 @@ def validate(excel_path: str) -> ValidationResult:
         result.errors.append("F0 column is empty — no data found.")
         return result
 
-    # ── 3. F0 format: letters + digits ───────────────────────────────────
+    # ── 3. F0 format ──────────────────────────────────────────────────────
     bad_f0 = [
         v for v in df[f0_col].unique()
         if v and not re.match(r"^[A-Za-z]+[\dn]+$", v)
@@ -100,15 +95,15 @@ def validate(excel_path: str) -> ValidationResult:
             + (" …" if len(bad_f0) > 10 else "")
         )
 
-    # ── 4. F1 format: either letters-only (header) or letters+2digits (leaf)
+    # ── 4. F1 format ──────────────────────────────────────────────────────
     bad_f1 = []
     for v in df[f1_col].unique():
         if not v:
             continue
         if re.match(r"^[A-Za-z]{2,5}$", v):
-            continue  # valid header
+            continue
         if re.match(r"^[A-Za-z]{2,3}\d{2}$", v):
-            continue  # valid leaf
+            continue
         bad_f1.append(v)
 
     if bad_f1:
@@ -119,34 +114,21 @@ def validate(excel_path: str) -> ValidationResult:
             + (" …" if len(bad_f1) > 10 else "")
         )
 
-    # ── 5. Every F1 leaf must be preceded by a section header ─────────────
+    # ── 5. Orphan leaf check ──────────────────────────────────────────────
     _check_orphan_leaves(df, f0_col, f1_col, result)
 
-    # ── 6. Description length ─────────────────────────────────────────────
-    DESC_WARN_LEN = 60
-    DESC_MAX_LEN  = 120
+    # ── 6. Description length — warning at 60 chars, one per row ─────────
+    DESC_MAX_LEN = 60
 
-    long_descs = df[
-        (df[desc_col].str.len() > DESC_MAX_LEN) & (df[desc_col] != "")
-    ]
-    if not long_descs.empty:
-        examples = long_descs[desc_col].iloc[:3].tolist()
+    for idx, row in df.iterrows():
+        desc = row[desc_col]
+        if not desc or len(desc) <= DESC_MAX_LEN:
+            continue
+        f0 = row[f0_col]
+        f1 = row[f1_col] if row[f1_col] else "—"
         result.warnings.append(
-            f"{len(long_descs)} description(s) exceed {DESC_MAX_LEN} chars and will "
-            f"be clipped in node boxes. Consider shortening them. Examples: "
-            + " | ".join(f'"{d[:60]}…"' for d in examples)
-        )
-
-    warn_descs = df[
-        (df[desc_col].str.len() > DESC_WARN_LEN) &
-        (df[desc_col].str.len() <= DESC_MAX_LEN) &
-        (df[desc_col] != "")
-    ]
-    if not warn_descs.empty:
-        result.warnings.append(
-            f"{len(warn_descs)} descriptions exceed {DESC_WARN_LEN} chars "
-            f"and may be truncated in node boxes. "
-            f"Consider shortening them."
+            f"Row {idx + 2}: {f0}/{f1}: description exceeds {DESC_MAX_LEN} chars "
+            f"and will be clipped — \"{desc[:60]}…\""
         )
 
     # ── 7. F0 description rows ────────────────────────────────────────────
@@ -167,7 +149,6 @@ def validate(excel_path: str) -> ValidationResult:
     leaf_rows = df[
         df[f1_col].str.match(r"^[A-Za-z]{2,3}\d{2}$") & (df[f1_col] != "")
     ]
-    # Only first row per F1 code matters (node title)
     first_per_leaf = leaf_rows.drop_duplicates(subset=[f0_col, f1_col], keep="first")
     empty_title = first_per_leaf[first_per_leaf[desc_col] == ""]
     if not empty_title.empty:
@@ -205,26 +186,33 @@ def _check_orphan_leaves(
     result: ValidationResult,
 ) -> None:
     """
-    Check that every leaf code has a matching section header in AT LEAST
-    ONE F0 instance. A header missing from some instances is fine —
-    the parser treats that as an exception leaf. A header missing from
-    ALL instances means the leaf is truly orphaned and will be silently
-    skipped during parsing.
-    """
-    # Collect which prefixes have a header in any instance
-    prefixes_with_header: set[str] = set()
-    for f1 in df[f1_col].unique():
-        if re.match(r"^[A-Za-z]{2,5}$", f1):
-            prefixes_with_header.add(f1)
+    Two-level orphan check:
 
-    # Find leaf codes whose prefix never appears as a header anywhere
+    1. ERROR — leaf prefix has no header anywhere in the file.
+    2. WARNING — leaf exists in an F0 instance where its header is missing
+       (header exists elsewhere but not in THIS instance → leaf will be
+       skipped for that instance during parsing).
+    """
+    # Build per-instance header sets
+    instance_headers: dict[str, set[str]] = {}
+    for _, row in df.iterrows():
+        f0 = row[f0_col]
+        f1 = row[f1_col]
+        if not f0 or not f1:
+            continue
+        if re.match(r"^[A-Za-z]{2,5}$", f1):
+            instance_headers.setdefault(f0, set()).add(f1)
+
+    all_headers: set[str] = set(h for hs in instance_headers.values() for h in hs)
+
+    # 1. ERROR: prefix has no header anywhere in the file
     orphan_prefixes: set[str] = set()
     for f1 in df[f1_col].unique():
         if not f1:
             continue
         if re.match(r"^[A-Za-z]{2,3}\d{2}$", f1):
             prefix = re.match(r"^([A-Za-z]+)", f1).group(1)
-            if prefix not in prefixes_with_header:
+            if prefix not in all_headers:
                 orphan_prefixes.add(prefix)
 
     if orphan_prefixes:
@@ -232,4 +220,30 @@ def _check_orphan_leaves(
             f"Leaf code prefix(es) have no section header row anywhere in the file: "
             f"{', '.join(sorted(orphan_prefixes))}. "
             f"Add a letters-only row (e.g. 'AHA') before the first leaf of each section."
+        )
+
+    # 2. WARNING: leaf exists in instance where its header is missing
+    skipped: list[str] = []
+    seen: set[str] = set()
+    for _, row in df.iterrows():
+        f0 = row[f0_col]
+        f1 = row[f1_col]
+        if not f0 or not f1:
+            continue
+        if re.match(r"^[A-Za-z]{2,3}\d{2}$", f1):
+            prefix = re.match(r"^([A-Za-z]+)", f1).group(1)
+            if prefix in all_headers:
+                inst_hdrs = instance_headers.get(f0, set())
+                if prefix not in inst_hdrs:
+                    key = f"{f1} in {f0}"
+                    if key not in seen:
+                        seen.add(key)
+                        skipped.append(key)
+
+    if skipped:
+        result.warnings.append(
+            f"{len(skipped)} leaf code(s) will be skipped — "
+            f"their section header is missing in that F0 instance: "
+            f"{', '.join(skipped[:10])}"
+            + (" …" if len(skipped) > 10 else "")
         )

@@ -38,6 +38,22 @@
     .status.ok { color: #1D9E75; }
     .status.warning { color: #854F0B; }
 
+    /* Persistent warnings panel */
+    .warnings-panel { background: #FFFBF0; border-bottom: 1px solid #FAC775; padding: 0; flex-shrink: 0; }
+    .warnings-header { display: flex; align-items: center; gap: 8px; padding: 7px 14px; cursor: pointer; user-select: none; }
+    .warnings-header:hover { background: #FEF6E4; }
+    .warnings-icon { font-size: 13px; }
+    .warnings-title { font-size: 12px; font-weight: 500; color: #854F0B; }
+    .warnings-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #FAC775; color: #854F0B; }
+    .warnings-toggle { margin-left: auto; font-size: 11px; color: #854F0B; opacity: 0.6; }
+    .warnings-body { border-top: 1px solid #FAC775; padding: 8px 14px; display: none; max-height: 160px; overflow-y: auto; }
+    .warnings-body.open { display: block; }
+    .warning-item { display: flex; gap: 8px; font-size: 11px; color: #6B4000; padding: 3px 0; border-bottom: 1px solid #FDE8B0; line-height: 1.5; }
+    .warning-item:last-child { border-bottom: none; }
+    .warning-item-icon { flex-shrink: 0; margin-top: 1px; }
+    .warnings-dismiss { font-size: 11px; color: #854F0B; background: none; border: none; cursor: pointer; margin-left: auto; opacity: 0.6; padding: 4px 0 0; }
+    .warnings-dismiss:hover { opacity: 1; }
+
     .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: #aaa; font-size: 13px; }
 
     .panel { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
@@ -109,6 +125,21 @@
       </div>
       <div class="status" id="status"></div>
     </div>
+
+    <!-- Persistent warnings panel -->
+    <div class="warnings-panel" id="warnings-panel" style="display:none">
+      <div class="warnings-header" onclick="toggleWarnings()">
+        <span class="warnings-icon">⚠️</span>
+        <span class="warnings-title">Warnings</span>
+        <span class="warnings-badge" id="warnings-count">0</span>
+        <span class="warnings-toggle" id="warnings-toggle">▼ show</span>
+      </div>
+      <div class="warnings-body" id="warnings-body">
+        <div id="warnings-list"></div>
+        <button class="warnings-dismiss" onclick="dismissWarnings()">Dismiss all ×</button>
+      </div>
+    </div>
+
     <div class="placeholder" id="placeholder" style="display:none">
       Select a Main System from the sidebar
     </div>
@@ -116,7 +147,14 @@
 </div>
 
 <script>
-  let state = { mainSystems: [], active: null, ungroup: {}, expanded: {} };
+  let state = {
+    mainSystems: [],
+    active: null,
+    ungroup: {},
+    expanded: {},
+    warnings: [],
+    warningsOpen: true,
+  };
 
   const area = document.getElementById('upload-area');
   const fileInput = document.getElementById('fileInput');
@@ -144,11 +182,7 @@
       return;
     }
 
-    if (data.warnings.length > 0) {
-      setStatus(data.warnings.map(w => `⚠ ${w}`).join('\n'), 'warning');
-    } else {
-      setStatus('✓ File looks good — parsing...', 'ok');
-    }
+    setStatus('Parsing...');
 
     const parseRes = await fetch('/parse', { method: 'POST' });
     const parseData = await parseRes.json();
@@ -158,7 +192,47 @@
     state.mainSystems = parseData.main_systems;
     state.ungroup = {};
     state.expanded = {};
+    state.warnings = data.warnings || [];
+    state.warningsOpen = true;
+
     renderSidebar(file.name);
+    renderWarnings();
+    setStatus('');
+  }
+
+  function renderWarnings() {
+    const panel = document.getElementById('warnings-panel');
+    const list = document.getElementById('warnings-list');
+    const count = document.getElementById('warnings-count');
+    const toggle = document.getElementById('warnings-toggle');
+    const body = document.getElementById('warnings-body');
+
+    if (!state.warnings.length) {
+      panel.style.display = 'none';
+      return;
+    }
+
+    panel.style.display = '';
+    count.textContent = state.warnings.length;
+    list.innerHTML = state.warnings.map(w =>
+      `<div class="warning-item">
+        <span class="warning-item-icon">⚠</span>
+        <span>${w}</span>
+      </div>`
+    ).join('');
+
+    body.classList.toggle('open', state.warningsOpen);
+    toggle.textContent = state.warningsOpen ? '▲ hide' : '▼ show';
+  }
+
+  function toggleWarnings() {
+    state.warningsOpen = !state.warningsOpen;
+    renderWarnings();
+  }
+
+  function dismissWarnings() {
+    state.warnings = [];
+    document.getElementById('warnings-panel').style.display = 'none';
   }
 
   function renderSidebar(filename) {
@@ -203,14 +277,14 @@
         </span>
       </div>
       <div class="panel-body">
-        ${ms.systems.map((sys, si) => renderSystemBlock(sys, si, ms.count, msIdx, ms)).join('')}
+        ${ms.systems.map((sys, si) => renderSystemBlock(sys, si, ms.count, msIdx)).join('')}
       </div>
     `;
 
     document.getElementById('main').appendChild(panel);
   }
 
-  function renderSystemBlock(sys, si, total, msIdx, ms) {
+  function renderSystemBlock(sys, si, total, msIdx) {
     const commonCount = sys.subsystems.filter(s => s.is_common).length;
     const excCount = sys.subsystems.length - commonCount;
 
@@ -230,14 +304,12 @@
       const isExpanded = !!state.expanded[ungroupKey];
       const rawCount = sub.raw_codes.length;
 
-      // Expand/collapse button — only if more than 1 raw code
       const expandBtn = rawCount > 1
         ? `<button class="expand-btn" onclick="toggleExpand('${ungroupKey}')">
              ${isExpanded ? `▼ hide (${rawCount})` : `▶ show (${rawCount})`}
            </button>`
         : `<span style="font-size:11px;color:#ccc">—</span>`;
 
-      // UNGROUP checkbox — only if more than 1 raw code
       const ungroupCell = rawCount > 1
         ? `<label style="display:flex;align-items:center;gap:4px;cursor:pointer">
              <input type="checkbox" ${isUngrouped ? 'checked' : ''}
@@ -246,7 +318,6 @@
            </label>`
         : '';
 
-      // Raw codes dropdown rows
       const rawRows = rawCount > 1
         ? `<tr class="raw-list" id="raw-${ungroupKey.replace(/\|/g,'_')}"
               style="${isExpanded ? '' : 'display:none'}">
@@ -306,10 +377,8 @@
 
   function toggleUngroup(key) {
     state.ungroup[key] = !state.ungroup[key];
-    // Re-render active panel to reflect change
     if (state.active !== null) {
       renderMainPanel(state.mainSystems[state.active], state.active);
-      // Restore active sidebar item
       document.querySelectorAll('.ms-item').forEach(el => el.classList.remove('active'));
       const el = document.getElementById(`ms-${state.active}`);
       if (el) el.classList.add('active');
@@ -368,11 +437,12 @@
   }
 
   function resetUpload() {
-    state = { mainSystems: [], active: null, ungroup: {}, expanded: {} };
+    state = { mainSystems: [], active: null, ungroup: {}, expanded: {}, warnings: [], warningsOpen: true };
     document.getElementById('upload-wrap').style.display = '';
     document.getElementById('placeholder').style.display = 'none';
     document.getElementById('topbar-file').style.display = 'none';
     document.getElementById('btn-generate').style.display = 'none';
+    document.getElementById('warnings-panel').style.display = 'none';
     document.getElementById('ms-list').innerHTML = '';
     document.getElementById('fileInput').value = '';
     const old = document.getElementById('main-panel');
