@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from typing import Optional
+from pathlib import Path
 
 from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.lib.colors import HexColor, white, black
-from reportlab.lib.utils import simpleSplit
+from reportlab.lib.utils import simpleSplit, ImageReader
 
 import config as cfg
 
@@ -137,6 +138,7 @@ def page_footer(c: rl_canvas.Canvas, page_num: int, total_pages: int) -> None:
         cfg.MARGIN + 1,
         f"Page {page_num} of {total_pages}",
     )
+    draw_logo(c)
 
 
 def back_button(c: rl_canvas.Canvas, target_page: int) -> None:
@@ -225,3 +227,17 @@ def section_nav_button(
     c.drawCentredString(cx, by + (btn_h - 7) / 2, label)
 
     link_rect(c, bx, by, btn_w, btn_h, target_page)
+
+
+def draw_logo(c: rl_canvas.Canvas) -> None:
+    logo_path = Path(cfg.LOGO_PATH)
+    if not logo_path.exists():
+        return
+    img = ImageReader(str(logo_path))
+    iw, ih = img.getSize()
+    ratio = cfg.LOGO_WIDTH / iw
+    draw_w = cfg.LOGO_WIDTH
+    draw_h = ih * ratio
+    x = cfg.PAGE_W - cfg.MARGIN - draw_w - cfg.LOGO_MARGIN
+    y = cfg.MARGIN + cfg.LOGO_MARGIN
+    c.drawImage(img, x, y, draw_w, draw_h, mask="auto", preserveAspectRatio=True)

@@ -316,19 +316,24 @@ def _parse_systems(
                 groups[key] = []
             groups[key].append(sub_code)
 
-        # Build Subsystem per group, splitting common vs exception within group
+        # Collect all common and exception codes across all groups
+        all_common_codes: list[str] = []
+        all_exception_codes: list[str] = []
+
         for key, codes in groups.items():
             codes_sorted = sorted(codes)
+            for c in codes_sorted:
+                if len(sub_instances[prefix].get(c, set())) == total:
+                    all_common_codes.append(c)
+                else:
+                    all_exception_codes.append(c)
 
+        # Build common Subsystems — grouped by desc template, merged where possible
+        for key, codes in groups.items():
             common_codes = [
-                c for c in codes_sorted
+                c for c in sorted(codes)
                 if len(sub_instances[prefix].get(c, set())) == total
             ]
-            exception_codes = [
-                c for c in codes_sorted
-                if c not in common_codes
-            ]
-
             if common_codes:
                 system.subsystems.append(Subsystem(
                     code=_build_range_code(common_codes),
@@ -338,24 +343,23 @@ def _parse_systems(
                     present_in=list(f0_instances),
                 ))
 
-            # Each exception code gets its own Subsystem with its exact present_in.
-            # _merge_exception_subsystems will later combine those with identical sets.
-            for c in exception_codes:
-                present_c = sorted(sub_instances[prefix].get(c, set()))
-                system.subsystems.append(Subsystem(
-                    code="=" + c,
-                    description=sub_desc[prefix].get(c, ""),
-                    is_common=False,
-                    raw_codes=[c],
-                    present_in=present_c,
-                ))
-
         # Merge consecutive common Subsystems with same text tokens
         # and one varying number (last position only)
         system.subsystems = _merge_common_subsystems(system.subsystems)
 
-        # Merge consecutive exception Subsystems with identical present_in sets
-        system.subsystems = _merge_exception_subsystems(system.subsystems, f0_instances)
+        # All exception codes → single OPTIONAL Subsystem with real description
+        if all_exception_codes:
+            all_exception_codes_sorted = sorted(all_exception_codes)
+            present: set[str] = set()
+            for c in all_exception_codes_sorted:
+                present |= sub_instances[prefix].get(c, set())
+            system.subsystems.append(Subsystem(
+                code=_build_range_code(all_exception_codes_sorted),
+                description=_build_range_desc(all_exception_codes_sorted, sub_desc[prefix]),
+                is_common=False,
+                raw_codes=all_exception_codes_sorted,
+                present_in=sorted(present),
+            ))
 
         if system.subsystems:
             result.append(system)
@@ -526,7 +530,7 @@ def _merge_common_subsystems(subsystems: list[Subsystem]) -> list[Subsystem]:
             i = j
             continue
 
-        # Only merge if exactly one numeric token varies AND it is the last one
+        # Merge if exactly one numeric token varies (any position)
         parts_first = tokenise(run[0].description)
         parts_last = tokenise(run[-1].description)
         do_merge = False
@@ -536,7 +540,7 @@ def _merge_common_subsystems(subsystems: list[Subsystem]) -> list[Subsystem]:
                 k for k in num_indices
                 if parts_first[k] != parts_last[k]
             ]
-            if len(diff_indices) == 1 and diff_indices[0] == num_indices[-1]:
+            if len(diff_indices) == 1:
                 do_merge = True
 
         if not do_merge:

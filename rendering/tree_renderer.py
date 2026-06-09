@@ -490,17 +490,7 @@ def _draw_legend(
     c.setFillColor(HexColor("#555555"))
 
     for i, sub in enumerate(exception_subs):
-        present = set(sub.present_in)
-        absent = sorted(all_instances - present)
-
-        if len(present) > total / 2:
-            instances_str = _group_instances_ranges(absent) if absent else "—"
-            label = "absent in"
-        else:
-            instances_str = _group_instances_ranges(sorted(present)) if present else "—"
-            label = "present in"
-
-        text = f"{sub.code} * — {label}: {instances_str}"
+        text = f"{sub.code} — OPTIONAL"
         y = legend_y + (len(exception_subs) - 1 - i) * line_h
         c.drawString(legend_x, y, text)
 
