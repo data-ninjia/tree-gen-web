@@ -76,6 +76,7 @@ def parse_file():
                     "is_common": sub.is_common,
                     "raw_codes": sub.raw_codes,
                     "raw_descriptions": sub.raw_descriptions,
+                    "raw_present_in": sub.raw_present_in,
                     "present_in": sub.present_in,
                 })
             systems.append({

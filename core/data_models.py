@@ -13,6 +13,7 @@ class Subsystem:
     is_common: bool
     raw_codes: list[str] = field(default_factory=list)
     raw_descriptions: dict[str, str] = field(default_factory=dict)
+    raw_present_in: dict[str, list[str]] = field(default_factory=dict)
     present_in: list[str] = field(default_factory=list)
 
 

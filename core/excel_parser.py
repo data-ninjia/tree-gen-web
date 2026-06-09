@@ -352,14 +352,18 @@ def _parse_systems(
         if all_exception_codes:
             all_exception_codes_sorted = sorted(all_exception_codes)
             present: set[str] = set()
+            raw_pres: dict[str, list[str]] = {}
             for c in all_exception_codes_sorted:
-                present |= sub_instances[prefix].get(c, set())
+                inst = sub_instances[prefix].get(c, set())
+                present |= inst
+                raw_pres[c] = sorted(inst)
             system.subsystems.append(Subsystem(
                 code=_build_range_code(all_exception_codes_sorted),
                 description=_build_range_desc(all_exception_codes_sorted, sub_desc[prefix]),
                 is_common=False,
                 raw_codes=all_exception_codes_sorted,
                 raw_descriptions={c: sub_desc[prefix].get(c, "") for c in all_exception_codes_sorted},
+                raw_present_in=raw_pres,
                 present_in=sorted(present),
             ))
 
@@ -565,6 +569,7 @@ def _merge_common_subsystems(subsystems: list[Subsystem]) -> list[Subsystem]:
             is_common=True,
             raw_codes=all_codes,
             raw_descriptions=all_raw_descs,
+            raw_present_in={},
             present_in=sub.present_in,
         ))
         i = j

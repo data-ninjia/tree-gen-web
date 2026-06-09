@@ -293,7 +293,7 @@
       const isFull = sub.is_common;
       const codeClass = isFull ? 'sub-code' : 'sub-code exception';
       const tag = isFull
-        ? '<span class="tag tag-common">STATIC</span>'
+        ? '<span class="tag tag-common">common</span>'
         : '<span class="tag tag-exc">OPTIONAL</span>';
       const bar = isFull
         ? `<span class="cov-bar"><span class="cov-fill cov-full" style="width:100%"></span></span>`
@@ -321,17 +321,35 @@
       const rawRows = rawCount > 1
         ? `<tr class="raw-list" id="raw-${ungroupKey.replace(/\|/g,'_')}"
               style="${isExpanded ? '' : 'display:none'}">
-             <td colspan="6">
-               <div class="raw-inner">
-                 <table class="raw-table">
-                   ${sub.raw_codes.map(c => `
-                     <tr>
-                       <td>=${c}</td>
-                       <td>${sub.raw_descriptions[c] || ''}</td>
-                     </tr>
-                   `).join('')}
-                 </table>
-               </div>
+             <td colspan="6" style="padding:0 !important;border-bottom:none !important;">
+               <table class="sub-table" style="background:#fafaf8">
+                 ${sub.raw_codes.map(c => {
+                   const rawDesc = sub.raw_descriptions[c] || '';
+                   // Use per-code present_in if available, else fall back to parent
+                   const rawPresent = (sub.raw_present_in && sub.raw_present_in[c])
+                     ? sub.raw_present_in[c]
+                     : sub.present_in;
+                   const rawPresentCount = rawPresent.length;
+                   const isRawCommon = rawPresentCount === total;
+                   const rawPct = total > 0 ? Math.round(rawPresentCount / total * 100) : 100;
+                   const rawBar = isRawCommon
+                     ? `<span class="cov-bar"><span class="cov-fill cov-full" style="width:100%"></span></span>`
+                     : `<span class="cov-bar"><span class="cov-fill cov-part" style="width:${rawPct}%"></span></span>`;
+                   const rawTag = isRawCommon
+                     ? '<span class="tag tag-common">common</span>'
+                     : '<span class="tag tag-exc">OPTIONAL</span>';
+                   return `<tr style="background:#fafaf8">
+                     <td style="width:90px"></td>
+                     <td style="width:130px;padding-left:28px">
+                       <span class="sub-code" style="font-size:11px">=${c}</span>
+                     </td>
+                     <td style="color:#555;max-width:260px">${rawDesc}</td>
+                     <td style="width:110px">${rawBar}<span style="font-size:11px;color:#999">${rawPresentCount}/${total}</span></td>
+                     <td style="width:80px">${rawTag}</td>
+                     <td style="width:90px"></td>
+                   </tr>`;
+                 }).join('')}
+               </table>
              </td>
            </tr>`
         : '';
