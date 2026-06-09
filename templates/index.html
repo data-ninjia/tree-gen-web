@@ -333,8 +333,8 @@
                    const isRawCommon = rawPresentCount === total;
                    const rawPct = total > 0 ? Math.round(rawPresentCount / total * 100) : 100;
                    const rawBar = isRawCommon
-                     ? `<span class="cov-bar"><span class="cov-fill cov-full" style="width:100%"></span></span>`
-                     : `<span class="cov-bar"><span class="cov-fill cov-part" style="width:${rawPct}%"></span></span>`;
+                     ? `<span class="cov-bar" style="background:#d4edda"><span class="cov-fill cov-full" style="width:100%"></span></span>`
+                     : `<span class="cov-bar" style="background:#fde8c8"><span class="cov-fill cov-part" style="width:${rawPct}%"></span></span>`;
                    const rawTag = isRawCommon
                      ? '<span class="tag tag-common">STATIC</span>'
                      : '<span class="tag tag-exc">OPTIONAL</span>';
@@ -344,7 +344,7 @@
                        <span class="sub-code" style="font-size:11px">=${c}</span>
                      </td>
                      <td style="color:#555;max-width:260px">${rawDesc}</td>
-                     <td style="width:110px">${rawBar}<span style="font-size:11px;color:#999">${rawPresentCount}/${total}</span></td>
+                     <td style="width:110px"><span style="font-size:11px;color:#999">${rawPresentCount}/${total}</span></td>
                      <td style="width:80px">${rawTag}</td>
                      <td style="width:90px"></td>
                    </tr>`;
@@ -359,7 +359,7 @@
           <td>${ungroupCell}</td>
           <td><span class="${codeClass}">${sub.code}</span></td>
           <td style="color:#555;max-width:260px">${sub.description}</td>
-          <td>${bar}<span style="font-size:11px;color:#999">${sub.present_in.length}/${total}</span></td>
+          <td><span style="font-size:11px;color:#999">${sub.present_in.length}/${total}</span></td>
           <td>${tag}</td>
           <td>${expandBtn}</td>
         </tr>
