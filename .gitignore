@@ -5,3 +5,9 @@ __pycache__/
 *.xlsx
 .env
 uploads/
+*.log
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
