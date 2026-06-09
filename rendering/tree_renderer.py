@@ -444,12 +444,13 @@ def _draw_subsystem_nodes(
             display = sub.code + (" *" if not sub.is_common else "")
             border = cfg.COL_SPEC_BORDER if not sub.is_common else black
 
-            # Badge: common → raw_codes count if >1
-            #        optional → "X/total" coverage
+            # Badge: common → "Total × N" if >1
+            #        optional → "Present on X of total"
             if sub.is_common:
-                badge = len(sub.raw_codes) if len(sub.raw_codes) > 1 else None
+                n = len(sub.raw_codes)
+                badge = f"Total × {n}" if n > 1 else None
             else:
-                badge = f"{len(sub.present_in)}/{total_instances}"
+                badge = f"Present on {len(sub.present_in)} of {total_instances}"
 
             node_box(
                 c,

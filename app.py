@@ -2,6 +2,7 @@ import os
 import tempfile
 import copy
 import math
+from datetime import datetime
 
 from flask import Flask, render_template, request, jsonify, send_file
 from reportlab.pdfgen import canvas as rl_canvas
@@ -145,12 +146,12 @@ def generate():
             )
 
     c.save()
-
+    
     return send_file(
         tmp.name,
         mimetype="application/pdf",
         as_attachment=True,
-        download_name="structure_tree.pdf",
+        download_name=f"structure_tree_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf",
     )
 
 

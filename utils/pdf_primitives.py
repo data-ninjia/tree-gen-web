@@ -4,7 +4,7 @@ from typing import Optional
 
 from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.lib.colors import HexColor, white, black
-from reportlab.lib.utils import simpleSplit
+from reportlab.lib.utils import simpleSplit, ImageReader
 
 import config as cfg
 
@@ -120,10 +120,10 @@ def node_box(
         link_rect(c, x, y, w, h, link_page)
 
     if isinstance(count, str):
-        # String badge (e.g. "27/28" for optional subsystems)
-        c.setFont(cfg.FONT_REG, 7)
+        # String badge — use smaller font to fit longer text
+        c.setFont(cfg.FONT_REG, 6)
         c.setFillColor(HexColor("#999999"))
-        c.drawCentredString(x + w / 2, y + 5, count)
+        c.drawCentredString(x + w / 2, y + 4, count)
     elif count is not None and count > 1:
         c.setFont(cfg.FONT_REG, 7)
         c.setFillColor(HexColor("#999999"))
@@ -142,6 +142,7 @@ def page_footer(c: rl_canvas.Canvas, page_num: int, total_pages: int) -> None:
         cfg.MARGIN + 1,
         f"Page {page_num} of {total_pages}",
     )
+    draw_logo(c)
 
 
 def back_button(c: rl_canvas.Canvas, target_page: int) -> None:
@@ -230,3 +231,27 @@ def section_nav_button(
     c.drawCentredString(cx, by + (btn_h - 7) / 2, label)
 
     link_rect(c, bx, by, btn_w, btn_h, target_page)
+
+from pathlib import Path
+from reportlab.lib.utils import ImageReader
+
+def draw_logo(c: rl_canvas.Canvas) -> None:
+    """Draw company logo in bottom-right corner if file exists."""
+    logo_path = Path(cfg.LOGO_PATH)
+    if not logo_path.exists():
+        return
+
+    img = ImageReader(str(logo_path))
+    iw, ih = img.getSize()
+    ratio = cfg.LOGO_WIDTH / iw
+    draw_w = cfg.LOGO_WIDTH
+    draw_h = ih * ratio
+
+    x = cfg.PAGE_W - cfg.MARGIN - draw_w - cfg.LOGO_MARGIN
+    y = cfg.MARGIN + cfg.LOGO_MARGIN
+
+    c.drawImage(
+        img, x, y, draw_w, draw_h,
+        mask="auto",
+        preserveAspectRatio=True,
+    )
