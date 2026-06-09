@@ -340,11 +340,12 @@ def _parse_systems(
                     description=_build_range_desc(common_codes, sub_desc[prefix]),
                     is_common=True,
                     raw_codes=common_codes,
+                    raw_descriptions={c: sub_desc[prefix].get(c, "") for c in common_codes},
                     present_in=list(f0_instances),
                 ))
 
         # Merge consecutive common Subsystems with same text tokens
-        # and one varying number (last position only)
+        # and one varying number (any position)
         system.subsystems = _merge_common_subsystems(system.subsystems)
 
         # All exception codes → single OPTIONAL Subsystem with real description
@@ -358,6 +359,7 @@ def _parse_systems(
                 description=_build_range_desc(all_exception_codes_sorted, sub_desc[prefix]),
                 is_common=False,
                 raw_codes=all_exception_codes_sorted,
+                raw_descriptions={c: sub_desc[prefix].get(c, "") for c in all_exception_codes_sorted},
                 present_in=sorted(present),
             ))
 
@@ -551,6 +553,9 @@ def _merge_common_subsystems(subsystems: list[Subsystem]) -> list[Subsystem]:
 
         # Merge the run
         all_codes = sorted(c for r in run for c in r.raw_codes)
+        all_raw_descs = {}
+        for r in run:
+            all_raw_descs.update(r.raw_descriptions)
         combined_code = _build_range_code(all_codes)
         combined_desc = _collapse_desc_ranges(run[0].description, run[-1].description)
 
@@ -559,6 +564,7 @@ def _merge_common_subsystems(subsystems: list[Subsystem]) -> list[Subsystem]:
             description=combined_desc,
             is_common=True,
             raw_codes=all_codes,
+            raw_descriptions=all_raw_descs,
             present_in=sub.present_in,
         ))
         i = j

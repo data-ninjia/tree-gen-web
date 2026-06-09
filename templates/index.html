@@ -55,7 +55,7 @@
     table.sub-table { width: 100%; border-collapse: collapse; font-size: 12px; }
     table.sub-table th { text-align: left; font-size: 11px; font-weight: 500; color: #999; padding: 6px 14px; border-bottom: 1px solid #e5e5e5; background: #fff; }
     table.sub-table td { padding: 6px 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-    table.sub-table tr:hover td { background: #f9f9f7; }
+    table.sub-table tr.sub-row:hover td { background: #f9f9f7; }
 
     .sub-code { font-family: monospace; font-size: 11px; background: #f0f0ee; padding: 2px 6px; border-radius: 4px; display: inline-block; }
     .sub-code.exception { background: #FEF6EC; color: #854F0B; }
@@ -66,6 +66,20 @@
     .tag { font-size: 10px; padding: 1px 5px; border-radius: 4px; }
     .tag-common { background: #EAF3DE; color: #3B6D11; }
     .tag-exc { background: #FAEEDA; color: #854F0B; }
+
+    .ungroup-label { font-size: 10px; color: #999; cursor: pointer; user-select: none; }
+    .ungroup-label.active { color: #2C5F8A; font-weight: 500; }
+
+    .expand-btn { font-size: 11px; color: #2C5F8A; cursor: pointer; background: none; border: none; padding: 0; display: flex; align-items: center; gap: 4px; }
+    .expand-btn:hover { text-decoration: underline; }
+
+    .raw-list { background: #fafaf8; }
+    .raw-list td { padding: 0 !important; border-bottom: none !important; }
+    .raw-inner { padding: 4px 14px 4px 48px; border-bottom: 1px solid #f0f0f0; }
+    table.raw-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    table.raw-table td { padding: 3px 8px; border-bottom: 1px solid #f5f5f3; color: #555; }
+    table.raw-table td:first-child { font-family: monospace; color: #2C5F8A; width: 100px; white-space: nowrap; }
+    table.raw-table tr:last-child td { border-bottom: none; }
   </style>
 </head>
 <body>
@@ -102,7 +116,7 @@
 </div>
 
 <script>
-  let state = { mainSystems: [], active: null };
+  let state = { mainSystems: [], active: null, ungroup: {}, expanded: {} };
 
   const area = document.getElementById('upload-area');
   const fileInput = document.getElementById('fileInput');
@@ -142,6 +156,8 @@
     if (parseData.error) { setStatus(parseData.error, 'error'); return; }
 
     state.mainSystems = parseData.main_systems;
+    state.ungroup = {};
+    state.expanded = {};
     renderSidebar(file.name);
   }
 
@@ -165,16 +181,14 @@
     document.querySelectorAll('.ms-item').forEach(el => el.classList.remove('active'));
     document.getElementById(`ms-${i}`).classList.add('active');
     state.active = i;
-    renderMainPanel(state.mainSystems[i]);
+    renderMainPanel(state.mainSystems[i], i);
   }
 
-  function renderMainPanel(ms) {
+  function renderMainPanel(ms, msIdx) {
     document.getElementById('placeholder').style.display = 'none';
 
     const old = document.getElementById('main-panel');
     if (old) old.remove();
-
-    const total = ms.count;
 
     const panel = document.createElement('div');
     panel.id = 'main-panel';
@@ -189,34 +203,79 @@
         </span>
       </div>
       <div class="panel-body">
-        ${ms.systems.map((sys, si) => renderSystemBlock(sys, si, total)).join('')}
+        ${ms.systems.map((sys, si) => renderSystemBlock(sys, si, ms.count, msIdx, ms)).join('')}
       </div>
     `;
 
     document.getElementById('main').appendChild(panel);
   }
 
-  function renderSystemBlock(sys, si, total) {
+  function renderSystemBlock(sys, si, total, msIdx, ms) {
     const commonCount = sys.subsystems.filter(s => s.is_common).length;
     const excCount = sys.subsystems.length - commonCount;
 
-    const rows = sys.subsystems.map(sub => {
+    const rows = sys.subsystems.map((sub, subIdx) => {
       const pct = total > 0 ? Math.round(sub.present_in.length / total * 100) : 100;
       const isFull = sub.is_common;
       const codeClass = isFull ? 'sub-code' : 'sub-code exception';
       const tag = isFull
-        ? '<span class="tag tag-common">static</span>'
-        : '<span class="tag tag-exc">optional</span>';
+        ? '<span class="tag tag-common">common</span>'
+        : '<span class="tag tag-exc">OPTIONAL</span>';
       const bar = isFull
         ? `<span class="cov-bar"><span class="cov-fill cov-full" style="width:100%"></span></span>`
         : `<span class="cov-bar"><span class="cov-fill cov-part" style="width:${pct}%"></span></span>`;
 
-      return `<tr>
-        <td><span class="${codeClass}">${sub.code}</span></td>
-        <td style="color:#555">${sub.description}</td>
-        <td>${bar}<span style="font-size:11px;color:#999">${sub.present_in.length}/${total}</span></td>
-        <td>${tag}</td>
-      </tr>`;
+      const ungroupKey = `${msIdx}|${sys.prefix}|${subIdx}`;
+      const isUngrouped = !!state.ungroup[ungroupKey];
+      const isExpanded = !!state.expanded[ungroupKey];
+      const rawCount = sub.raw_codes.length;
+
+      // Expand/collapse button — only if more than 1 raw code
+      const expandBtn = rawCount > 1
+        ? `<button class="expand-btn" onclick="toggleExpand('${ungroupKey}')">
+             ${isExpanded ? `▼ hide (${rawCount})` : `▶ show (${rawCount})`}
+           </button>`
+        : `<span style="font-size:11px;color:#ccc">—</span>`;
+
+      // UNGROUP checkbox — only if more than 1 raw code
+      const ungroupCell = rawCount > 1
+        ? `<label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+             <input type="checkbox" ${isUngrouped ? 'checked' : ''}
+               onchange="toggleUngroup('${ungroupKey}')">
+             <span class="ungroup-label ${isUngrouped ? 'active' : ''}">UNGROUP</span>
+           </label>`
+        : '';
+
+      // Raw codes dropdown rows
+      const rawRows = rawCount > 1
+        ? `<tr class="raw-list" id="raw-${ungroupKey.replace(/\|/g,'_')}"
+              style="${isExpanded ? '' : 'display:none'}">
+             <td colspan="6">
+               <div class="raw-inner">
+                 <table class="raw-table">
+                   ${sub.raw_codes.map(c => `
+                     <tr>
+                       <td>=${c}</td>
+                       <td>${sub.raw_descriptions[c] || ''}</td>
+                     </tr>
+                   `).join('')}
+                 </table>
+               </div>
+             </td>
+           </tr>`
+        : '';
+
+      return `
+        <tr class="sub-row">
+          <td>${ungroupCell}</td>
+          <td><span class="${codeClass}">${sub.code}</span></td>
+          <td style="color:#555;max-width:260px">${sub.description}</td>
+          <td>${bar}<span style="font-size:11px;color:#999">${sub.present_in.length}/${total}</span></td>
+          <td>${tag}</td>
+          <td>${expandBtn}</td>
+        </tr>
+        ${rawRows}
+      `;
     }).join('');
 
     return `
@@ -225,16 +284,18 @@
           <span class="system-code">=${sys.prefix}</span>
           <span class="system-desc">${sys.description}</span>
           <span class="system-count">
-            ${commonCount} common${excCount > 0 ? ` · ${excCount} exceptions` : ''}
+            ${commonCount} common${excCount > 0 ? ` · ${excCount} optional` : ''}
           </span>
         </div>
         <table class="sub-table">
           <thead>
             <tr>
+              <th style="width:90px"></th>
               <th style="width:130px">Code</th>
               <th>Description</th>
               <th style="width:110px">Coverage</th>
               <th style="width:80px">Status</th>
+              <th style="width:90px">Raw codes</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -243,13 +304,51 @@
     `;
   }
 
+  function toggleUngroup(key) {
+    state.ungroup[key] = !state.ungroup[key];
+    // Re-render active panel to reflect change
+    if (state.active !== null) {
+      renderMainPanel(state.mainSystems[state.active], state.active);
+      // Restore active sidebar item
+      document.querySelectorAll('.ms-item').forEach(el => el.classList.remove('active'));
+      const el = document.getElementById(`ms-${state.active}`);
+      if (el) el.classList.add('active');
+    }
+  }
+
+  function toggleExpand(key) {
+    state.expanded[key] = !state.expanded[key];
+    const safeKey = key.replace(/\|/g, '_');
+    const row = document.getElementById(`raw-${safeKey}`);
+    const btn = document.querySelector(`button[onclick="toggleExpand('${key}')"]`);
+    if (row) row.style.display = state.expanded[key] ? '' : 'none';
+    if (btn) {
+      const sub = findSubByKey(key);
+      const count = sub ? sub.raw_codes.length : '?';
+      btn.textContent = state.expanded[key] ? `▼ hide (${count})` : `▶ show (${count})`;
+    }
+  }
+
+  function findSubByKey(key) {
+    const [msIdx, prefix, subIdx] = key.split('|');
+    const ms = state.mainSystems[parseInt(msIdx)];
+    if (!ms) return null;
+    const sys = ms.systems.find(s => s.prefix === prefix);
+    if (!sys) return null;
+    return sys.subsystems[parseInt(subIdx)] || null;
+  }
+
   async function generatePdf() {
     const btn = document.getElementById('btn-generate');
     btn.textContent = 'Generating...';
     btn.disabled = true;
 
     try {
-      const res = await fetch('/generate', { method: 'POST' });
+      const res = await fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ungroup: state.ungroup }),
+      });
       if (!res.ok) {
         const data = await res.json();
         alert(data.error || 'Generation failed');
@@ -269,7 +368,7 @@
   }
 
   function resetUpload() {
-    state = { mainSystems: [], active: null };
+    state = { mainSystems: [], active: null, ungroup: {}, expanded: {} };
     document.getElementById('upload-wrap').style.display = '';
     document.getElementById('placeholder').style.display = 'none';
     document.getElementById('topbar-file').style.display = 'none';
