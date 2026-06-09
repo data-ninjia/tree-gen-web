@@ -31,6 +31,7 @@ def draw_tree_pages(
     overview_page: int,
     total_pages: int,
     col_labels: dict,
+    matrix_page: int | None = None,
 ) -> int:
     """
     Draw all tree pages for one MainSystem onto canvas c.
@@ -60,6 +61,7 @@ def draw_tree_pages(
             col_labels,
             system_pages=system_pages,
             first_page=first_page,
+            matrix_page=matrix_page,
         )
 
         if page_i < n_pages - 1:
@@ -178,6 +180,7 @@ def _draw_page(
     col_labels,
     system_pages: dict[int, list[int]] | None = None,
     first_page: int = 1,
+    matrix_page: int | None = None,
 ) -> None:
 
     _draw_header(c, group, page_i, n_pages)
@@ -200,8 +203,8 @@ def _draw_page(
     _draw_nav_badges(c, geom, prev_pg, next_pg, page_i, n_pages)
     _draw_system_nodes(c, col_specs, geom, system_pages=system_pages,
                        page_i=page_i, first_page=first_page)
-    _draw_subsystem_nodes(c, col_specs, geom)
-    _draw_legend(c, col_specs, group)
+    _draw_subsystem_nodes(c, col_specs, geom, total_instances=group.count)
+    _draw_legend(c, col_specs, group, matrix_page=matrix_page)
     _draw_level_legend(c, col_labels)
 
 
@@ -421,7 +424,10 @@ def _draw_system_nodes(
 
 
 def _draw_subsystem_nodes(
-    c: rl_canvas.Canvas, col_specs: list[_ColSpec], g: _Geom
+    c: rl_canvas.Canvas,
+    col_specs: list[_ColSpec],
+    g: _Geom,
+    total_instances: int = 1,
 ) -> None:
     """Draw Subsystem (F1 code) nodes for each column."""
     for spec, cx in zip(col_specs, g.col_xs):
@@ -438,6 +444,13 @@ def _draw_subsystem_nodes(
             display = sub.code + (" *" if not sub.is_common else "")
             border = cfg.COL_SPEC_BORDER if not sub.is_common else black
 
+            # Badge: common → raw_codes count if >1
+            #        optional → "X/total" coverage
+            if sub.is_common:
+                badge = len(sub.raw_codes) if len(sub.raw_codes) > 1 else None
+            else:
+                badge = f"{len(sub.present_in)}/{total_instances}"
+
             node_box(
                 c,
                 x=leaf_nx,
@@ -450,7 +463,7 @@ def _draw_subsystem_nodes(
                 desc_fs=cfg.TREE_LEAF_DESC_FS,
                 border=border,
                 dashed=not sub.is_common,
-                count=len(sub.raw_codes),
+                count=badge,
             )
 
 
@@ -460,16 +473,15 @@ def _draw_subsystem_nodes(
 
 
 def _draw_legend(
-    c: rl_canvas.Canvas, col_specs: list[_ColSpec], group: MainSystem
+    c: rl_canvas.Canvas,
+    col_specs: list[_ColSpec],
+    group: MainSystem,
+    matrix_page: int | None = None,
 ) -> None:
     """
     Draw legend at bottom of page for exception (non-common) Subsystems.
-    Uses whichever list is shorter — present_in or absent_from:
-      * =MQA21..29 — present in: G001..G003   (minority)
-      * =MQA21..29 — absent in:  G005         (majority)
+    If matrix_page is provided, adds "* — see on page N" reference.
     """
-    from core.excel_parser import _group_instances_ranges
-
     exception_subs: list[Subsystem] = []
     for spec in col_specs:
         subsystems = spec.system.subsystems[
@@ -482,9 +494,6 @@ def _draw_legend(
     if not exception_subs:
         return
 
-    total = group.count
-    all_instances = set(group.instances)
-
     legend_x = cfg.USABLE_X
     legend_y = cfg.USABLE_BOT + 0.4 * 28.35
     line_h = 11.0
@@ -492,15 +501,17 @@ def _draw_legend(
 
     c.setFont(cfg.FONT_BOLD, fs)
     c.setFillColor(black)
-    c.drawString(legend_x, legend_y + len(exception_subs) * line_h, "NOTES:")
+    c.drawString(legend_x, legend_y + line_h, "NOTES:")
 
-    c.setFont(cfg.FONT_REG, fs)
-    c.setFillColor(HexColor("#555555"))
-
-    for i, sub in enumerate(exception_subs):
-        text = f"{sub.code} — OPTIONAL"
-        y = legend_y + (len(exception_subs) - 1 - i) * line_h
-        c.drawString(legend_x, y, text)
+    if matrix_page:
+        from utils.pdf_primitives import link_rect
+        ref_text = f"* — SEE ON PAGE {matrix_page}"
+        ref_y = legend_y
+        c.setFont(cfg.FONT_BOLD, fs)
+        c.setFillColor(black)
+        c.drawString(legend_x, ref_y, ref_text)
+        text_w = c.stringWidth(ref_text, cfg.FONT_BOLD, fs)
+        link_rect(c, legend_x, ref_y - 2, text_w, fs + 4, matrix_page)
 
 
 def _draw_level_legend(c: rl_canvas.Canvas, col_labels: dict) -> None:

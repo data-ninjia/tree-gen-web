@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from typing import Optional
-from pathlib import Path
 
 from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.lib.colors import HexColor, white, black
-from reportlab.lib.utils import simpleSplit, ImageReader
+from reportlab.lib.utils import simpleSplit
 
 import config as cfg
 
@@ -120,7 +119,12 @@ def node_box(
     if link_page is not None:
         link_rect(c, x, y, w, h, link_page)
 
-    if count > 1:
+    if isinstance(count, str):
+        # String badge (e.g. "27/28" for optional subsystems)
+        c.setFont(cfg.FONT_REG, 7)
+        c.setFillColor(HexColor("#999999"))
+        c.drawCentredString(x + w / 2, y + 5, count)
+    elif count is not None and count > 1:
         c.setFont(cfg.FONT_REG, 7)
         c.setFillColor(HexColor("#999999"))
         c.drawCentredString(x + w / 2, y + 5, f"× {count}")
@@ -138,7 +142,6 @@ def page_footer(c: rl_canvas.Canvas, page_num: int, total_pages: int) -> None:
         cfg.MARGIN + 1,
         f"Page {page_num} of {total_pages}",
     )
-    draw_logo(c)
 
 
 def back_button(c: rl_canvas.Canvas, target_page: int) -> None:
@@ -218,26 +221,12 @@ def section_nav_button(
     by = y - btn_h - 4 if direction == "down" else y + 4
 
     c.setFillColor(HexColor("#EAF3FB"))
-    c.setStrokeColor(black)
+    c.setStrokeColor(HexColor("#2C5F8A"))
     c.setLineWidth(0.8)
     c.roundRect(bx, by, btn_w, btn_h, btn_r, fill=1, stroke=1)
 
     c.setFont(cfg.FONT_BOLD, 7)
-    c.setFillColor(black)
+    c.setFillColor(HexColor("#2C5F8A"))
     c.drawCentredString(cx, by + (btn_h - 7) / 2, label)
 
     link_rect(c, bx, by, btn_w, btn_h, target_page)
-
-
-def draw_logo(c: rl_canvas.Canvas) -> None:
-    logo_path = Path(cfg.LOGO_PATH)
-    if not logo_path.exists():
-        return
-    img = ImageReader(str(logo_path))
-    iw, ih = img.getSize()
-    ratio = cfg.LOGO_WIDTH / iw
-    draw_w = cfg.LOGO_WIDTH
-    draw_h = ih * ratio
-    x = cfg.PAGE_W - cfg.MARGIN - draw_w - cfg.LOGO_MARGIN
-    y = cfg.MARGIN + cfg.LOGO_MARGIN
-    c.drawImage(img, x, y, draw_w, draw_h, mask="auto", preserveAspectRatio=True)

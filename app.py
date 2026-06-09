@@ -1,6 +1,7 @@
 import os
 import tempfile
 import copy
+import math
 
 from flask import Flask, render_template, request, jsonify, send_file
 from reportlab.pdfgen import canvas as rl_canvas
@@ -12,6 +13,7 @@ from core.excel_parser import parse
 from core.data_models import Subsystem
 from rendering.overview_renderer import draw_overview_pages
 from rendering.tree_renderer import draw_tree_pages
+from rendering.matrix_renderer import draw_matrix_page, has_optional
 
 app = Flask(__name__)
 
@@ -103,16 +105,13 @@ def generate():
     if not os.path.exists(path):
         return jsonify({"error": "no file uploaded"}), 400
 
-    # Read ungroup state from request body
     body = request.get_json(silent=True) or {}
     ungroup = body.get("ungroup", {})
 
     main_systems, col_labels = parse(path)
-
-    # Apply ungroup — expand grouped Subsystems into individual ones
     main_systems = _apply_ungroup(main_systems, ungroup)
 
-    total_pages, overview_page_nums, f1_first_pages = _plan_pages(main_systems)
+    total_pages, overview_page_nums, f1_first_pages, matrix_pages = _plan_pages(main_systems)
 
     tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
     tmp.close()
@@ -121,13 +120,29 @@ def generate():
     c.setTitle("Structure Tree")
 
     draw_overview_pages(c, main_systems, overview_page_nums, f1_first_pages, total_pages)
-    c.showPage()
 
-    for ms in main_systems:
-        first_pg = f1_first_pages[ms.code]
-        n = draw_tree_pages(c, ms, first_pg, overview_page_nums[0], total_pages, col_labels)
-        if first_pg + n <= total_pages:
+    for i, ms in enumerate(main_systems):
+        c.showPage()
+        ov_pg = overview_page_nums[i // cfg.CARDS_PER_PAGE]
+        mat_pg = matrix_pages.get(ms.code)
+
+        draw_tree_pages(
+            c, ms,
+            first_page=f1_first_pages[ms.code],
+            overview_page=ov_pg,
+            total_pages=total_pages,
+            col_labels=col_labels,
+            matrix_page=mat_pg,
+        )
+
+        if mat_pg is not None:
             c.showPage()
+            draw_matrix_page(
+                c, ms,
+                pg=mat_pg,
+                overview_page=ov_pg,
+                total_pages=total_pages,
+            )
 
     c.save()
 
@@ -140,11 +155,6 @@ def generate():
 
 
 def _apply_ungroup(main_systems, ungroup: dict):
-    """
-    For each Subsystem marked as ungrouped, replace it with individual
-    Subsystem objects — one per raw_code.
-    Key format: "ms_index|sys_prefix|sub_index"
-    """
     if not ungroup:
         return main_systems
 
@@ -169,11 +179,9 @@ def _apply_ungroup(main_systems, ungroup: dict):
         except (IndexError, StopIteration):
             continue
 
-        # Only expand if more than one raw code
         if len(sub.raw_codes) <= 1:
             continue
 
-        # Replace grouped Subsystem with individual ones
         expanded = [
             Subsystem(
                 code="=" + c,
@@ -181,7 +189,8 @@ def _apply_ungroup(main_systems, ungroup: dict):
                 is_common=sub.is_common,
                 raw_codes=[c],
                 raw_descriptions={c: sub.raw_descriptions.get(c, "")},
-                present_in=sub.present_in,
+                raw_present_in={c: sub.raw_present_in.get(c, sub.present_in)},
+                present_in=sub.raw_present_in.get(c, sub.present_in),
             )
             for c in sub.raw_codes
         ]
@@ -197,12 +206,12 @@ def _apply_ungroup(main_systems, ungroup: dict):
 
 def _plan_pages(main_systems):
     from rendering.tree_renderer import _chunk_systems, _plan_all_pages
-    import math
 
     n_ov_pages = math.ceil(len(main_systems) / cfg.CARDS_PER_PAGE)
     overview_page_nums = list(range(1, n_ov_pages + 1))
 
     f1_first_pages = {}
+    matrix_pages = {}
     cursor = n_ov_pages + 1
 
     for ms in main_systems:
@@ -210,9 +219,12 @@ def _plan_pages(main_systems):
         chunks = _chunk_systems(ms.systems, cfg.MAX_COLS_PER_PAGE)
         pages, _ = _plan_all_pages(chunks)
         cursor += len(pages)
+        if has_optional(ms):
+            matrix_pages[ms.code] = cursor
+            cursor += 1
 
     total_pages = cursor - 1
-    return total_pages, overview_page_nums, f1_first_pages
+    return total_pages, overview_page_nums, f1_first_pages, matrix_pages
 
 
 if __name__ == "__main__":
