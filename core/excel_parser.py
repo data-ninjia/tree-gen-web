@@ -14,20 +14,19 @@ from core.data_models import MainSystem, System, Subsystem
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def parse(excel_path: str) -> tuple[list[MainSystem], dict[str, str]]:
+def parse(
+    excel_path: str,
+    column_map: dict[str, str] | None = None,
+) -> tuple[list[MainSystem], dict[str, str]]:
     """
     Read Excel file and return list of MainSystem objects.
 
-    Expected input format (see INPUT_REQUIREMENTS.md):
-      - One row per item
-      - F0 column : letters + digits, e.g. G001, T001  → MainSystem
-      - F1 column : either
-          (a) letters only, 2-5 chars  → System header, e.g. AHA, MDA
-          (b) letters + exactly 2 digits → Subsystem code, e.g. AHA10, MDA11
-      - Description column: free text
+    column_map: optional dict mapping role → column name, e.g.:
+      {"Root": "F0 ANNN", "Level 1": "F1 AAANN", "Description": "RDS-PP Code Description"}
+    If not provided, columns are auto-detected by name.
     """
     df = _load(excel_path)
-    f0_col, f1_col, desc_col = _detect_columns(df)
+    f0_col, f1_col, desc_col = _detect_columns(df, column_map=column_map)
     raw_groups = _group_f0(df, f0_col, f1_col, desc_col)
     main_systems = [_build_main_system(df, rec, f0_col, f1_col, desc_col) for rec in raw_groups]
     col_labels = {"f0": f0_col, "f1": f1_col}
@@ -47,7 +46,24 @@ def _load(path: str) -> pd.DataFrame:
     )
 
 
-def _detect_columns(df: pd.DataFrame) -> tuple[str, str, str]:
+def _detect_columns(
+    df: pd.DataFrame,
+    column_map: dict[str, str] | None = None,
+) -> tuple[str, str, str]:
+    """
+    Detect F0, F1 and Description columns.
+    If column_map is provided, use it directly.
+    Otherwise auto-detect by column name keywords.
+    """
+    if column_map:
+        f0  = column_map.get("Root")
+        f1  = column_map.get("Level 1")
+        desc = column_map.get("Description")
+        missing = [r for r, v in [("Root", f0), ("Level 1", f1), ("Description", desc)] if not v]
+        if missing:
+            raise ValueError(f"column_map is missing roles: {missing}")
+        return f0, f1, desc
+
     def find(candidates: list[str]) -> str:
         for cand in candidates:
             for col in df.columns:

@@ -3,6 +3,7 @@ import tempfile
 import copy
 import math
 from datetime import datetime
+import pandas as pd
 
 from flask import Flask, render_template, request, jsonify, send_file
 from reportlab.pdfgen import canvas as rl_canvas
@@ -61,11 +62,13 @@ def upload():
 @app.route("/parse", methods=["POST"])
 def parse_file():
     path = os.path.join(app.config["UPLOAD_FOLDER"], "input.xlsx")
-
     if not os.path.exists(path):
         return jsonify({"error": "no file uploaded"}), 400
 
-    main_systems, col_labels = parse(path)
+    body = request.get_json(silent=True) or {}
+    column_map = body.get("column_map", {})
+
+    main_systems, col_labels = parse(path, column_map=column_map)
 
     result = []
     for ms in main_systems:
@@ -108,8 +111,9 @@ def generate():
 
     body = request.get_json(silent=True) or {}
     ungroup = body.get("ungroup", {})
+    column_map = body.get("column_map") or None
 
-    main_systems, col_labels = parse(path)
+    main_systems, col_labels = parse(path, column_map=column_map)
     main_systems = _apply_ungroup(main_systems, ungroup)
 
     total_pages, overview_page_nums, f1_first_pages, matrix_pages = _plan_pages(main_systems)
@@ -151,8 +155,29 @@ def generate():
         tmp.name,
         mimetype="application/pdf",
         as_attachment=True,
-        download_name=f"structure_tree_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf",
+        download_name=f"structure_tree_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
     )
+
+
+@app.route("/columns", methods=["POST"])
+def get_columns():
+    path = os.path.join(app.config["UPLOAD_FOLDER"], "input.xlsx")
+
+    if not os.path.exists(path):
+        return jsonify({"error": "no file uploaded"}), 400
+
+    df = pd.read_excel(path, dtype=str, nrows=5)
+    df = df.fillna("").apply(lambda col: col.str.strip() if col.dtype == "object" else col)
+
+    columns = []
+    for col in df.columns:
+        examples = [v for v in df[col].tolist() if v][:3]
+        columns.append({
+            "name": col.strip(),
+            "examples": examples,
+        })
+
+    return jsonify({"columns": columns})
 
 
 def _apply_ungroup(main_systems, ungroup: dict):

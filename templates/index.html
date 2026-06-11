@@ -38,7 +38,6 @@
     .status.ok { color: #1D9E75; }
     .status.warning { color: #854F0B; }
 
-    /* Persistent warnings panel */
     .warnings-panel { background: #FFFBF0; border-bottom: 1px solid #FAC775; padding: 0; flex-shrink: 0; }
     .warnings-header { display: flex; align-items: center; gap: 8px; padding: 7px 14px; cursor: pointer; user-select: none; }
     .warnings-header:hover { background: #FEF6E4; }
@@ -50,7 +49,6 @@
     .warnings-body.open { display: block; }
     .warning-item { display: flex; gap: 8px; font-size: 11px; color: #6B4000; padding: 3px 0; border-bottom: 1px solid #FDE8B0; line-height: 1.5; }
     .warning-item:last-child { border-bottom: none; }
-    .warning-item-icon { flex-shrink: 0; margin-top: 1px; }
     .warnings-dismiss { font-size: 11px; color: #854F0B; background: none; border: none; cursor: pointer; margin-left: auto; opacity: 0.6; padding: 4px 0 0; }
     .warnings-dismiss:hover { opacity: 1; }
 
@@ -96,6 +94,31 @@
     table.raw-table td { padding: 3px 8px; border-bottom: 1px solid #f5f5f3; color: #555; }
     table.raw-table td:first-child { font-family: monospace; color: #2C5F8A; width: 100px; white-space: nowrap; }
     table.raw-table tr:last-child td { border-bottom: none; }
+
+    /* ── Column Mapper Modal ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .modal { background: #fff; border-radius: 12px; width: 680px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    .modal-header { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #e5e5e5; flex-shrink: 0; }
+    .modal-title { font-size: 14px; font-weight: 500; }
+    .modal-subtitle { font-size: 12px; color: #666; margin-left: 10px; }
+    .modal-body { overflow-y: auto; flex: 1; padding: 12px 20px; }
+    .modal-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid #e5e5e5; flex-shrink: 0; }
+
+    .mapper-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .mapper-table th { text-align: left; font-size: 11px; font-weight: 500; color: #999; padding: 6px 8px; border-bottom: 1px solid #e5e5e5; }
+    .mapper-table td { padding: 7px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    .mapper-table tr:hover td { background: #f9f9f7; }
+    .col-name { font-family: monospace; font-size: 11px; font-weight: 500; color: #1a1a1a; }
+    .col-examples { font-size: 11px; color: #888; }
+    .col-example-val { display: inline-block; background: #f0f0ee; padding: 1px 5px; border-radius: 3px; margin-right: 3px; font-family: monospace; font-size: 10px; }
+    .role-select { font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ddd; background: #fff; color: #1a1a1a; cursor: pointer; width: 140px; }
+    .role-select:focus { outline: none; border-color: #2C5F8A; }
+    .role-select.assigned-root { border-color: #2C5F8A; background: #EAF3FB; color: #185FA5; font-weight: 500; }
+    .role-select.assigned-level1 { border-color: #1D9E75; background: #EAF3DE; color: #1D5C3A; font-weight: 500; }
+    .role-select.assigned-desc { border-color: #854F0B; background: #FAEEDA; color: #854F0B; font-weight: 500; }
+
+    .mapper-hint { font-size: 11px; color: #666; background: #f5f5f3; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; line-height: 1.6; }
+    .mapper-validation { font-size: 11px; color: #c0392b; padding: 6px 0; display: none; }
   </style>
 </head>
 <body>
@@ -106,6 +129,37 @@
   <div style="margin-left:auto;display:flex;gap:8px">
     <button class="btn" onclick="resetUpload()">Upload new</button>
     <button class="btn btn-primary" id="btn-generate" style="display:none" onclick="generatePdf()">Generate PDF</button>
+  </div>
+</div>
+
+<!-- Column Mapper Modal -->
+<div class="modal-overlay" id="mapper-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Column Mapping</span>
+      <span class="modal-subtitle">Assign a role to each column</span>
+    </div>
+    <div class="modal-body">
+      <div class="mapper-hint">
+        Assign <strong>Root</strong>, <strong>Level 1</strong> and <strong>Description</strong> to the correct columns.
+        All other columns will be ignored. Level 1 headers (letters only) are detected automatically.
+      </div>
+      <div class="mapper-validation" id="mapper-validation"></div>
+      <table class="mapper-table">
+        <thead>
+          <tr>
+            <th style="width:200px">Column</th>
+            <th>Examples</th>
+            <th style="width:150px">Role</th>
+          </tr>
+        </thead>
+        <tbody id="mapper-tbody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeMapper()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmMapper()">Confirm →</button>
+    </div>
   </div>
 </div>
 
@@ -126,7 +180,6 @@
       <div class="status" id="status"></div>
     </div>
 
-    <!-- Persistent warnings panel -->
     <div class="warnings-panel" id="warnings-panel" style="display:none">
       <div class="warnings-header" onclick="toggleWarnings()">
         <span class="warnings-icon">⚠️</span>
@@ -154,6 +207,9 @@
     expanded: {},
     warnings: [],
     warningsOpen: true,
+    columnMap: {},
+    pendingFile: null,
+    pendingWarnings: [],
   };
 
   const area = document.getElementById('upload-area');
@@ -182,9 +238,144 @@
       return;
     }
 
-    setStatus('Parsing...');
+    state.pendingFile = file;
+    state.pendingWarnings = data.warnings || [];
 
-    const parseRes = await fetch('/parse', { method: 'POST' });
+    // Fetch columns and show mapper
+    setStatus('Reading columns...');
+    const colRes = await fetch('/columns', { method: 'POST' });
+    const colData = await colRes.json();
+
+    if (colData.error) { setStatus(colData.error, 'error'); return; }
+
+    setStatus('');
+    showMapper(colData.columns);
+  }
+
+  // ── Column Mapper ──────────────────────────────────────────────────────
+
+  function showMapper(columns) {
+    state.columns = columns;
+    const tbody = document.getElementById('mapper-tbody');
+    const roles = ['— ignore —', 'Root', 'Level 1', 'Description'];
+
+    // Auto-detect roles based on column name keywords
+    function autoRole(name) {
+      const n = name.toLowerCase();
+      if (n.includes('f0')) return 'Root';
+      if (n.includes('f1')) return 'Level 1';
+      if (n.includes('description') || n.includes('desc')) return 'Description';
+      return '— ignore —';
+    }
+
+    tbody.innerHTML = columns.map((col, i) => {
+      const role = autoRole(col.name);
+      const examples = col.examples.map(e =>
+        `<span class="col-example-val">${e}</span>`
+      ).join('');
+      const roleClass = role === 'Root' ? 'assigned-root'
+        : role === 'Level 1' ? 'assigned-level1'
+        : role === 'Description' ? 'assigned-desc' : '';
+
+      const options = roles.map(r =>
+        `<option value="${r}" ${r === role ? 'selected' : ''}>${r}</option>`
+      ).join('');
+
+      return `<tr>
+        <td><span class="col-name">${col.name}</span></td>
+        <td><span class="col-examples">${examples}</span></td>
+        <td>
+          <select class="role-select ${roleClass}" data-col="${col.name}"
+            onchange="onRoleChange(this)">
+            ${options}
+          </select>
+        </td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('mapper-modal').style.display = 'flex';
+    document.getElementById('mapper-validation').style.display = 'none';
+  }
+
+  function onRoleChange(sel) {
+    const role = sel.value;
+    sel.className = 'role-select ' + (
+      role === 'Root' ? 'assigned-root' :
+      role === 'Level 1' ? 'assigned-level1' :
+      role === 'Description' ? 'assigned-desc' : ''
+    );
+
+    // Ensure only one column per role (except ignore)
+    if (role !== '— ignore —') {
+      document.querySelectorAll(`.role-select`).forEach(s => {
+        if (s !== sel && s.value === role) {
+          s.value = '— ignore —';
+          s.className = 'role-select';
+        }
+      });
+    }
+  }
+
+  function closeMapper() {
+    document.getElementById('mapper-modal').style.display = 'none';
+    setStatus('');
+  }
+
+  async function confirmMapper() {
+    const selects = document.querySelectorAll('.role-select');
+    const map = {};
+    selects.forEach(s => {
+      if (s.value !== '— ignore —') {
+        map[s.value] = s.dataset.col;
+      }
+    });
+
+    const validation = document.getElementById('mapper-validation');
+
+    // 1. Validate required roles are assigned
+    const missing = ['Root', 'Level 1', 'Description'].filter(r => !map[r]);
+    if (missing.length > 0) {
+      validation.innerHTML = `Please assign: <strong>${missing.join(', ')}</strong>`;
+      validation.style.display = 'block';
+      return;
+    }
+
+    // 2. Validate column formats against example values
+    const colExamples = {};
+    (state.columns || []).forEach(c => colExamples[c.name] = c.examples);
+
+    const rootExamples   = colExamples[map['Root']]    || [];
+    const level1Examples = colExamples[map['Level 1']] || [];
+    const descExamples   = colExamples[map['Description']] || [];
+
+    const rootOk = rootExamples.some(v => /^[A-Za-z]+[\dn]+$/.test(v.trim()));
+    const level1Ok = level1Examples.some(v =>
+      /^[A-Za-z]{2,5}$/.test(v.trim()) || /^[A-Za-z]{2,3}\d{2}$/.test(v.trim())
+    );
+    const descOk = descExamples.some(v => v.trim().length > 0);
+
+    const formatErrors = [];
+    if (!rootOk)   formatErrors.push(`"${map['Root']}" doesn't look like a Root column — expected values like G001, T001`);
+    if (!level1Ok) formatErrors.push(`"${map['Level 1']}" doesn't look like a Level 1 column — expected values like AHA or AHA10`);
+    if (!descOk)   formatErrors.push(`"${map['Description']}" appears to be empty`);
+
+    if (formatErrors.length > 0) {
+      validation.innerHTML = formatErrors.map(e => `✗ ${e}`).join('<br>');
+      validation.style.display = 'block';
+      return;
+    }
+
+    validation.style.display = 'none';
+    state.columnMap = map;
+    document.getElementById('mapper-modal').style.display = 'none';
+
+    // Now parse
+    setStatus('Parsing...');
+    const parseRes = await fetch('/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ column_map: map }),
+    });
     const parseData = await parseRes.json();
 
     if (parseData.error) { setStatus(parseData.error, 'error'); return; }
@@ -192,13 +383,15 @@
     state.mainSystems = parseData.main_systems;
     state.ungroup = {};
     state.expanded = {};
-    state.warnings = data.warnings || [];
+    state.warnings = state.pendingWarnings;
     state.warningsOpen = true;
 
-    renderSidebar(file.name);
+    renderSidebar(state.pendingFile.name);
     renderWarnings();
     setStatus('');
   }
+
+  // ── Warnings ───────────────────────────────────────────────────────────
 
   function renderWarnings() {
     const panel = document.getElementById('warnings-panel');
@@ -207,18 +400,12 @@
     const toggle = document.getElementById('warnings-toggle');
     const body = document.getElementById('warnings-body');
 
-    if (!state.warnings.length) {
-      panel.style.display = 'none';
-      return;
-    }
+    if (!state.warnings.length) { panel.style.display = 'none'; return; }
 
     panel.style.display = '';
     count.textContent = state.warnings.length;
     list.innerHTML = state.warnings.map(w =>
-      `<div class="warning-item">
-        <span class="warning-item-icon">⚠</span>
-        <span>${w}</span>
-      </div>`
+      `<div class="warning-item"><span>⚠</span><span>${w}</span></div>`
     ).join('');
 
     body.classList.toggle('open', state.warningsOpen);
@@ -234,6 +421,8 @@
     state.warnings = [];
     document.getElementById('warnings-panel').style.display = 'none';
   }
+
+  // ── Sidebar ────────────────────────────────────────────────────────────
 
   function renderSidebar(filename) {
     document.getElementById('upload-wrap').style.display = 'none';
@@ -260,7 +449,6 @@
 
   function renderMainPanel(ms, msIdx) {
     document.getElementById('placeholder').style.display = 'none';
-
     const old = document.getElementById('main-panel');
     if (old) old.remove();
 
@@ -270,17 +458,15 @@
     panel.innerHTML = `
       <div class="panel-toolbar">
         <span class="panel-toolbar-title">${ms.code}</span>
-        <span class="panel-toolbar-desc">${ms.description}</span>
+        <span style="font-size:12px;color:#666">${ms.description}</span>
         <span style="margin-left:auto;font-size:11px;color:#999">
-          ${ms.count} instance${ms.count > 1 ? 's' : ''} &nbsp;·&nbsp;
-          ${ms.systems.length} systems
+          ${ms.count} instance${ms.count > 1 ? 's' : ''} &nbsp;·&nbsp; ${ms.systems.length} systems
         </span>
       </div>
       <div class="panel-body">
         ${ms.systems.map((sys, si) => renderSystemBlock(sys, si, ms.count, msIdx)).join('')}
       </div>
     `;
-
     document.getElementById('main').appendChild(panel);
   }
 
@@ -293,11 +479,8 @@
       const isFull = sub.is_common;
       const codeClass = isFull ? 'sub-code' : 'sub-code exception';
       const tag = isFull
-        ? '<span class="tag tag-common">STATIC</span>'
+        ? '<span class="tag tag-common">common</span>'
         : '<span class="tag tag-exc">OPTIONAL</span>';
-      const bar = isFull
-        ? `<span class="cov-bar"><span class="cov-fill cov-full" style="width:100%"></span></span>`
-        : `<span class="cov-bar"><span class="cov-fill cov-part" style="width:${pct}%"></span></span>`;
 
       const ungroupKey = `${msIdx}|${sys.prefix}|${subIdx}`;
       const isUngrouped = !!state.ungroup[ungroupKey];
@@ -325,18 +508,13 @@
                <table class="sub-table" style="background:#fafaf8">
                  ${sub.raw_codes.map(c => {
                    const rawDesc = sub.raw_descriptions[c] || '';
-                   // Use per-code present_in if available, else fall back to parent
                    const rawPresent = (sub.raw_present_in && sub.raw_present_in[c])
-                     ? sub.raw_present_in[c]
-                     : sub.present_in;
+                     ? sub.raw_present_in[c] : sub.present_in;
                    const rawPresentCount = rawPresent.length;
                    const isRawCommon = rawPresentCount === total;
                    const rawPct = total > 0 ? Math.round(rawPresentCount / total * 100) : 100;
-                   const rawBar = isRawCommon
-                     ? `<span class="cov-bar" style="background:#d4edda"><span class="cov-fill cov-full" style="width:100%"></span></span>`
-                     : `<span class="cov-bar" style="background:#fde8c8"><span class="cov-fill cov-part" style="width:${rawPct}%"></span></span>`;
                    const rawTag = isRawCommon
-                     ? '<span class="tag tag-common">STATIC</span>'
+                     ? '<span class="tag tag-common">common</span>'
                      : '<span class="tag tag-exc">OPTIONAL</span>';
                    return `<tr style="background:#fafaf8">
                      <td style="width:90px"></td>
@@ -344,7 +522,7 @@
                        <span class="sub-code" style="font-size:11px">=${c}</span>
                      </td>
                      <td style="color:#555;max-width:260px">${rawDesc}</td>
-                     <td style="width:110px"><span style="font-size:11px;color:#999">${rawPresentCount}/${total}</span></td>
+                     <td style="width:110px"><span style="font-size:11px;color:${isRawCommon ? '#1D9E75' : '#854F0B'}">${rawPresentCount}/${total}</span></td>
                      <td style="width:80px">${rawTag}</td>
                      <td style="width:90px"></td>
                    </tr>`;
@@ -434,7 +612,7 @@
       const res = await fetch('/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ungroup: state.ungroup }),
+        body: JSON.stringify({ ungroup: state.ungroup, column_map: state.columnMap }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -456,7 +634,7 @@
   }
 
   function resetUpload() {
-    state = { mainSystems: [], active: null, ungroup: {}, expanded: {}, warnings: [], warningsOpen: true };
+    state = { mainSystems: [], active: null, ungroup: {}, expanded: {}, warnings: [], warningsOpen: true, columnMap: {}, pendingFile: null, pendingWarnings: [] };
     document.getElementById('upload-wrap').style.display = '';
     document.getElementById('placeholder').style.display = 'none';
     document.getElementById('topbar-file').style.display = 'none';
