@@ -80,6 +80,23 @@
 
     .raw-list td { padding: 0 !important; border-bottom: none !important; }
 
+    /* ── Guide Modal ── */
+    .guide-modal { background: #fff; border-radius: 12px; width: 760px; max-width: 95vw; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    .guide-body { overflow-y: auto; flex: 1; padding: 24px 28px; line-height: 1.7; font-size: 13px; }
+    .guide-body h2 { font-size: 16px; font-weight: 600; margin: 0 0 12px; color: #1a1a1a; }
+    .guide-body h3 { font-size: 13px; font-weight: 600; margin: 20px 0 6px; color: #2C5F8A; }
+    .guide-body p { margin: 0 0 10px; color: #444; }
+    .guide-body ul { margin: 0 0 10px 18px; color: #444; }
+    .guide-body li { margin-bottom: 4px; }
+    .guide-body table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 12px; }
+    .guide-body th { text-align: left; padding: 6px 10px; background: #f5f5f3; border: 1px solid #e5e5e5; font-weight: 500; color: #555; }
+    .guide-body td { padding: 6px 10px; border: 1px solid #e5e5e5; color: #444; }
+    .guide-body code { font-family: monospace; font-size: 11px; background: #f0f0ee; padding: 1px 5px; border-radius: 3px; }
+    .guide-body .tip { background: #EAF3FB; border-left: 3px solid #2C5F8A; padding: 8px 12px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 12px; color: #185FA5; }
+    .guide-body .warn { background: #FFFBF0; border-left: 3px solid #FAC775; padding: 8px 12px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 12px; color: #854F0B; }
+    .guide-section { border-bottom: 1px solid #e5e5e5; padding-bottom: 16px; margin-bottom: 16px; }
+    .guide-section:last-child { border-bottom: none; }
+
     /* ── Column Mapper Modal ── */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
     .modal { background: #fff; border-radius: 12px; width: 680px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
@@ -111,8 +128,106 @@
   <span class="topbar-title">Structure Tree Generator</span>
   <span class="topbar-file" id="topbar-file" style="display:none"></span>
   <div style="margin-left:auto;display:flex;gap:8px">
+    <button class="btn" onclick="showGuide()">How to use</button>
     <button class="btn" onclick="resetUpload()">Upload new</button>
     <button class="btn btn-primary" id="btn-generate" style="display:none" onclick="generatePdf()">Generate PDF</button>
+  </div>
+</div>
+
+<!-- Guide Modal -->
+<div class="modal-overlay" id="guide-modal" style="display:none" onclick="if(event.target===this)closeGuide()">
+  <div class="guide-modal">
+    <div class="modal-header">
+      <span class="modal-title">How to use Structure Tree Generator</span>
+      <button class="btn" onclick="closeGuide()" style="margin-left:auto">✕ Close</button>
+    </div>
+    <div class="guide-body">
+
+      <div class="guide-section">
+        <h2>What does this tool do?</h2>
+        <p>Structure Tree Generator takes an Excel file with a list of system components and turns it into a professional PDF diagram — a tree structure that shows how everything is organized across multiple sites or installations.</p>
+      </div>
+
+      <div class="guide-section">
+        <h2>Preparing your Excel file</h2>
+        <p>Your file must have <strong>at least 3 columns</strong>:</p>
+        <table>
+          <tr><th>Column</th><th>What goes here</th><th>Example values</th></tr>
+          <tr><td><strong>Main System</strong></td><td>The site or installation code</td><td><code>G001</code>, <code>T001</code>, <code>W102</code></td></tr>
+          <tr><td><strong>System / Subsystem</strong></td><td>The system or subsystem code</td><td><code>MQA</code>, <code>MQA01</code>, <code>MSE10</code></td></tr>
+          <tr><td><strong>Description</strong></td><td>A short name for each item</td><td>Photovoltaic Generator System 1</td></tr>
+        </table>
+
+        <h3>Main System column</h3>
+        <ul>
+          <li>Format: prefix + 1 letter followed by 3 digits (or without prefix also applicable)  — <code>=G001</code>, <code>=T001</code>, <code>=W102</code></li>
+          <li>Each unique code is treated as a separate installation</li>
+          <li>Add one row per installation where the System/Subsystem column is <em>empty</em> — this is the description row for that installation</li>
+        </ul>
+
+        <h3>System / Subsystem column</h3>
+        <ul>
+          <li><strong>System headers</strong> — letters only, 3 characters: <code>MQA</code>, <code>MSE</code>, <code>AHA</code> — these are group titles</li>
+          <li><strong>Subsystems</strong> — 3 letters + exactly 2 digits: <code>MQA01</code>, <code>MSE10</code> — these are the individual items</li>
+          <li>Always add a System header row <strong>before</strong> the subsystems that belong to it, in every installation</li>
+        </ul>
+
+        <h3>Description column</h3>
+        <ul>
+          <li>Keep descriptions under <strong>60 characters</strong> — longer ones will be cut off in the PDF</li>
+        </ul>
+
+        <div class="tip">💡 Example of a correctly structured file:<br><br>
+          <code>=G001 | &nbsp;&nbsp;&nbsp;&nbsp; | Photovoltaic Field 1</code><br>
+          <code>=G001 | MQA &nbsp; | Photovoltaic Generator System</code><br>
+          <code>=G001 | MQA01 | Photovoltaic Generator System 1</code><br>
+          <code>=G001 | MQA02 | Photovoltaic Generator System 2</code><br>
+          <code>=G002 | &nbsp;&nbsp;&nbsp;&nbsp; | Photovoltaic Field 2</code><br>
+          <code>=G002 | MQA &nbsp; | Photovoltaic Generator System</code><br>
+          <code>=G002 | MQA01 | Photovoltaic Generator System 1</code>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <h2>Step-by-step</h2>
+
+        <h3>Step 1 — Upload your file</h3>
+        <p>Drag and drop your <code>.xlsx</code> file onto the upload area, or click <strong>Browse file</strong>.</p>
+
+        <h3>Step 2 — Map your columns</h3>
+        <p>A window will appear showing all columns with example values. Assign each column a role using the dropdown. The tool tries to detect them automatically — check that the assignments look correct before clicking <strong>Confirm</strong>.</p>
+
+        <h3>Step 3 — Review the structure</h3>
+        <p>The left panel shows all Main Systems found. Click any to see its systems and subsystems. Each row shows the code, description, coverage (e.g. <code>27/28</code>) and status — <strong>STATIC</strong> if present in all installations, <strong>OPTIONAL</strong> if only in some.</p>
+        <p>Tick <strong>UNGROUP</strong> on any grouped row to expand it into individual codes in the PDF.</p>
+
+        <h3>Step 4 — Generate PDF</h3>
+        <p>Click <strong>Generate PDF</strong> in the top right. The file downloads automatically.</p>
+      </div>
+
+      <div class="guide-section">
+        <h2>Understanding the PDF</h2>
+        <ul>
+          <li><strong>Overview page</strong> — a grid of cards, one per Main System. Click any card to jump to its tree.</li>
+          <li><strong>Tree pages</strong> — hierarchy diagram with Main System at top, Systems in the middle, Subsystems below. Items marked <code>*</code> are OPTIONAL.</li>
+          <li><strong>Matrix page</strong> — appears if there are OPTIONAL subsystems. Shows a table with installations as columns and optional subsystems as rows, with <code>✕</code> where present.</li>
+        </ul>
+      </div>
+
+      <div class="guide-section">
+        <h2>Common problems</h2>
+        <div class="warn">
+          <strong>"Missing Main System column"</strong> — assign the correct column to Main System in the mapper.
+        </div>
+        <div class="warn">
+          <strong>"Subsystem has no System header" warning</strong> — a subsystem like <code>MQA01</code> exists in an installation but has no <code>MQA</code> header row in that same installation. Add the missing header row.
+        </div>
+        <div class="warn">
+          <strong>Descriptions cut off in PDF</strong> — shorten them to under 60 characters.
+        </div>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -206,6 +321,14 @@
     area.classList.remove('dragover');
     if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
   });
+
+  function showGuide() {
+    document.getElementById('guide-modal').style.display = 'flex';
+  }
+
+  function closeGuide() {
+    document.getElementById('guide-modal').style.display = 'none';
+  }
 
   async function uploadFile(file) {
     if (!file.name.endsWith('.xlsx')) { setStatus('Only .xlsx files are supported', 'error'); return; }
