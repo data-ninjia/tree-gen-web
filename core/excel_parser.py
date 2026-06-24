@@ -6,7 +6,7 @@ from collections import defaultdict, OrderedDict
 
 import pandas as pd
 
-from core.data_models import MainSystem, System, Subsystem
+from core.data_models import RootNode, Section, Node
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -17,24 +17,30 @@ from core.data_models import MainSystem, System, Subsystem
 def parse(
     excel_path: str,
     column_map: dict[str, str] | None = None,
-) -> tuple[list[MainSystem], dict[str, str]]:
+) -> tuple[list[RootNode], dict[str, str]]:
     """
-    Read Excel file and return list of MainSystem objects.
+    Parse Excel file into a list of RootNode objects.
 
-    column_map: optional dict mapping role → column name, e.g.:
-      {"Root": "F0 ANNN", "Level 1": "F1 AAANN", "Description": "RDS-PP Code Description"}
-    If not provided, columns are auto-detected by name.
+    column_map roles:
+        "Main System"        → F0 column (e.g. G001)
+        "System / Subsystem" → F1 column (e.g. MQA, MQA01)
+        "Description"        → description column
     """
     df = _load(excel_path)
-    f0_col, f1_col, desc_col = _detect_columns(df, column_map=column_map)
-    raw_groups = _group_f0(df, f0_col, f1_col, desc_col)
-    main_systems = [_build_main_system(df, rec, f0_col, f1_col, desc_col) for rec in raw_groups]
-    col_labels = {"f0": f0_col, "f1": f1_col}
-    return main_systems, col_labels
+    cols = _detect_columns(df, column_map)
+
+    raw_groups = _group_roots(df, cols)
+    roots = [_build_root(df, rec, cols) for rec in raw_groups]
+
+    col_labels = {
+        "f0": cols["root"],
+        "f1": cols["level1"],
+    }
+    return roots, col_labels
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Loading & column detection
+# Loading
 # ═════════════════════════════════════════════════════════════════════════════
 
 
@@ -46,23 +52,25 @@ def _load(path: str) -> pd.DataFrame:
     )
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# Column detection
+# ═════════════════════════════════════════════════════════════════════════════
+
+
 def _detect_columns(
     df: pd.DataFrame,
     column_map: dict[str, str] | None = None,
-) -> tuple[str, str, str]:
-    """
-    Detect F0, F1 and Description columns.
-    If column_map is provided, use it directly.
-    Otherwise auto-detect by column name keywords.
-    """
+) -> dict[str, str]:
     if column_map:
-        f0  = column_map.get("Root")
-        f1  = column_map.get("Level 1")
-        desc = column_map.get("Description")
-        missing = [r for r, v in [("Root", f0), ("Level 1", f1), ("Description", desc)] if not v]
+        missing = [r for r in ["Main System", "System / Subsystem", "Description"]
+                   if not column_map.get(r)]
         if missing:
             raise ValueError(f"column_map is missing roles: {missing}")
-        return f0, f1, desc
+        return {
+            "root":   column_map["Main System"],
+            "level1": column_map["System / Subsystem"],
+            "desc":   column_map["Description"],
+        }
 
     def find(candidates: list[str]) -> str:
         for cand in candidates:
@@ -74,20 +82,19 @@ def _detect_columns(
             f"Available: {list(df.columns)}"
         )
 
-    return (
-        find(["F0 ANNN", "F0"]),
-        find(["F1 AAANN", "F1"]),
-        find(["Code Description", "Description"]),
-    )
+    return {
+        "root":   find(["F0 ANNN", "F0"]),
+        "level1": find(["F1 AAANN", "F1"]),
+        "desc":   find(["Code Description", "Description"]),
+    }
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# F0 (MainSystem) grouping
+# Root grouping
 # ═════════════════════════════════════════════════════════════════════════════
 
 
 def _f0_group_key(code: str) -> str:
-    """G001 → 'G00',  W101 → 'W10'."""
     m = re.match(r"^([A-Za-z]+)(\d+)$", code)
     if not m:
         return code
@@ -95,11 +102,9 @@ def _f0_group_key(code: str) -> str:
 
 
 def _generalise_f0_code(instances: list[str]) -> str:
-    """['G001'..'G028'] → '=G00n',  ['K001'] → '=K001'."""
     if len(instances) == 1:
         code = instances[0]
         return code if code.startswith("=") else f"={code}"
-
     common = []
     for chars in zip(*instances):
         if len(set(chars)) == 1:
@@ -107,20 +112,17 @@ def _generalise_f0_code(instances: list[str]) -> str:
         else:
             break
     prefix = "".join(common)
-
     m = re.match(r"^([A-Za-z]+)(\d+)$", instances[0])
     if m:
-        letters = m.group(1)
+        letters   = m.group(1)
         digit_len = len(m.group(2))
         digit_prefix = prefix[len(letters):]
         padded = (digit_prefix + "0" * digit_len)[: digit_len - 1]
         return "=" + letters + padded + "n"
-
     return "=" + prefix + "n"
 
 
 def _generalise_desc_from_list(descs: list[str]) -> str:
-    """Numbers that differ across descriptions → 'n', same → kept."""
     if not descs:
         return ""
     if len(descs) == 1:
@@ -132,7 +134,6 @@ def _generalise_desc_from_list(descs: list[str]) -> str:
     tokenised = [tokenise(d) for d in descs]
     if len(set(len(t) for t in tokenised)) > 1:
         return descs[0]
-
     result = []
     for i, token in enumerate(tokenised[0]):
         all_values = [t[i] for t in tokenised]
@@ -143,25 +144,22 @@ def _generalise_desc_from_list(descs: list[str]) -> str:
     return "".join(result)
 
 
-def _group_f0(
-    df: pd.DataFrame,
-    f0_col: str,
-    f1_col: str,
-    desc_col: str,
-) -> list[dict]:
-    # Collect MainSystem descriptions from rows where F1 is empty
+def _group_roots(df: pd.DataFrame, cols: dict) -> list[dict]:
+    f0_col   = cols["root"]
+    f1_col   = cols["level1"]
+    desc_col = cols["desc"]
+
     f0_desc: dict[str, str] = {}
     for _, row in df.iterrows():
-        f0 = row[f0_col]
-        f1 = row[f1_col]
+        f0   = row[f0_col]
+        f1   = row[f1_col]
         desc = row[desc_col]
         if f0 and not f1 and desc and f0 not in f0_desc:
             f0_desc[f0] = desc
 
-    # Group by key (letters + all-but-last digit)
     raw: dict[str, list[str]] = defaultdict(list)
     for f0 in df[f0_col].dropna().unique():
-        f0 = f0.strip()
+        f0 = str(f0).strip()
         if f0:
             raw[_f0_group_key(f0)].append(f0)
 
@@ -171,23 +169,23 @@ def _group_f0(
         gen_code = _generalise_f0_code(instances_sorted)
         raw_desc = f0_desc.get(instances_sorted[0], "")
         gen_desc = (
-            _generalise_desc_from_list([f0_desc.get(i, "") for i in instances_sorted])
-            if len(instances) > 1
-            else raw_desc
+            _generalise_desc_from_list(
+                [f0_desc.get(i, "") for i in instances_sorted]
+            )
+            if len(instances) > 1 else raw_desc
         )
         records.append({
-            "code": gen_code,
+            "code":        gen_code,
             "description": gen_desc,
-            "instances": instances_sorted,
-            "count": len(instances),
+            "instances":   instances_sorted,
+            "count":       len(instances),
         })
 
-    # Post-merge: same letter prefix + same description → one group
     merged: OrderedDict[str, dict] = OrderedDict()
     for rec in records:
         m = re.match(r"^=?([A-Za-z]+)", rec["code"])
         letter = m.group(1) if m else rec["code"]
-        mkey = letter + "|" + rec["description"]
+        mkey   = letter + "|" + rec["description"]
         if mkey in merged:
             merged[mkey]["instances"].extend(rec["instances"])
             merged[mkey]["count"] += rec["count"]
@@ -204,201 +202,144 @@ def _group_f0(
     return sorted(result, key=lambda r: r["code"])
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# MainSystem builder
-# ═════════════════════════════════════════════════════════════════════════════
-
-
-def _build_main_system(
-    df: pd.DataFrame,
-    rec: dict,
-    f0_col: str,
-    f1_col: str,
-    desc_col: str,
-) -> MainSystem:
-    systems = _parse_systems(df, rec["instances"], f0_col, f1_col, desc_col)
-    return MainSystem(
+def _build_root(df: pd.DataFrame, rec: dict, cols: dict) -> RootNode:
+    sections = _parse_sections(df, rec["instances"], cols)
+    return RootNode(
         code=rec["code"],
         description=rec["description"],
         instances=rec["instances"],
         count=rec["count"],
-        systems=systems,
+        sections=sections,
     )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# System / Subsystem parsing
+# Section + Node parsing
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def _is_system_header(f1: str) -> bool:
-    """
-    True if F1 value is a System header: 2-5 letters, no digits.
-    e.g. AHA, MDA, BFA → True
-         AHA10, MDA11  → False
-    """
+def _is_section_header(f1: str) -> bool:
+    """Letters only 2-5 chars — section header (e.g. MQA, GC)."""
     return bool(re.match(r"^[A-Za-z]{2,5}$", f1.strip()))
 
 
-def _parse_systems(
+def _parse_sections(
     df: pd.DataFrame,
     f0_instances: list[str],
-    f0_col: str,
-    f1_col: str,
-    desc_col: str,
-) -> list[System]:
-    """
-    Parse F1 rows for a group of F0 instances into System objects,
-    each containing grouped Subsystem objects.
-
-    Structure expected in input:
-      AHA        → System header (letters only)
-      AHA01      → Subsystem under AHA
-      AHA10      → Subsystem under AHA
-      AHA11      → Subsystem under AHA
-
-    Grouping of Subsystems:
-      - Subsystems with same description template (numbers→#) AND differing
-        only in last digit → grouped into a range (AHA01..03, AHA11..19)
-      - Otherwise → each Subsystem code is its own entry
-    """
-    total = len(f0_instances)
+    cols: dict,
+) -> list[Section]:
+    total  = len(f0_instances)
     f0_set = set(f0_instances)
+    f0_col, f1_col, desc_col = cols["root"], cols["level1"], cols["desc"]
 
     rows = df[(df[f0_col].isin(f0_set)) & (df[f1_col] != "")]
 
-    # ── Step 1: collect per-instance data preserving Excel row order ──────
-    # instance_systems[f0][prefix] = {"desc": str, "subsystems": [(code, desc), ...]}
-    instance_systems: dict[str, OrderedDict] = {
+    # ── Step 1: collect per-instance data ────────────────────────────────
+    instance_sections: dict[str, OrderedDict] = {
         f0: OrderedDict() for f0 in f0_instances
     }
 
     for _, row in rows.iterrows():
-        f0 = row[f0_col]
-        f1 = row[f1_col]
+        f0   = row[f0_col]
+        f1   = row[f1_col]
         desc = row[desc_col]
-
-        if f0 not in instance_systems:
+        if f0 not in instance_sections:
             continue
-
-        if _is_system_header(f1):
-            if f1 not in instance_systems[f0]:
-                instance_systems[f0][f1] = {"desc": desc, "subsystems": []}
+        if _is_section_header(f1):
+            if f1 not in instance_sections[f0]:
+                instance_sections[f0][f1] = {"desc": desc, "nodes": []}
         else:
             m = re.match(r"^([A-Za-z]+)", f1)
             prefix = m.group(1) if m else None
-            if prefix and prefix in instance_systems[f0]:
-                instance_systems[f0][prefix]["subsystems"].append((f1, desc))
+            if prefix and prefix in instance_sections[f0]:
+                instance_sections[f0][prefix]["nodes"].append((f1, desc))
 
-    # ── Step 2: aggregate across all instances ────────────────────────────
-    all_prefixes: OrderedDict[str, str] = OrderedDict()
-    sub_instances: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
-    sub_desc: dict[str, dict[str, str]] = defaultdict(dict)
-    sub_order: dict[str, list[str]] = defaultdict(list)
+    # ── Step 2: aggregate across instances ───────────────────────────────
+    all_prefixes: OrderedDict[str, str]          = OrderedDict()
+    node_instances: dict[str, dict[str, set]]    = defaultdict(lambda: defaultdict(set))
+    node_desc_map:  dict[str, dict[str, str]]    = defaultdict(dict)
+    node_order:     dict[str, list[str]]         = defaultdict(list)
 
-    for f0, systems in instance_systems.items():
-        for prefix, data in systems.items():
+    for f0, sections in instance_sections.items():
+        for prefix, data in sections.items():
             if prefix not in all_prefixes:
                 all_prefixes[prefix] = data["desc"]
-            for sub_code, sub_desc_val in data["subsystems"]:
-                sub_instances[prefix][sub_code].add(f0)
-                if sub_code not in sub_desc[prefix]:
-                    sub_desc[prefix][sub_code] = sub_desc_val
-                if sub_code not in sub_order[prefix]:
-                    sub_order[prefix].append(sub_code)
+            for node_code, node_desc_val in data["nodes"]:
+                node_instances[prefix][node_code].add(f0)
+                if node_code not in node_desc_map[prefix]:
+                    node_desc_map[prefix][node_code] = node_desc_val
+                if node_code not in node_order[prefix]:
+                    node_order[prefix].append(node_code)
 
-    # ── Step 3: group Subsystem codes ────────────────────────────────────
-    # Two codes belong to the same group if:
-    #   1. Same description template (all numbers replaced with #)
-    #   2. Differ only in the last character (last digit)
-    result: list[System] = []
+    # ── Step 3 & 4: group + build nodes ──────────────────────────────────
+    result: list[Section] = []
 
-    for prefix, sys_desc in all_prefixes.items():
-        system = System(
-            prefix=prefix,
-            label=prefix,
-            description=sys_desc,
-            subsystems=[],
-        )
+    for prefix, sec_desc in all_prefixes.items():
+        section = Section(prefix=prefix, label=prefix, description=sec_desc, nodes=[])
 
-        # Group key = (last_digit_key, desc_template)
         groups: OrderedDict[str, list[str]] = OrderedDict()
-        for sub_code in sub_order[prefix]:
-            node_desc = sub_desc[prefix].get(sub_code, "")
-            dk = _last_digit_key(sub_code)
-            tmpl = re.sub(r"\d+", "#", node_desc)
-            key = dk + "|" + tmpl
+        for node_code in node_order[prefix]:
+            nd   = node_desc_map[prefix].get(node_code, "")
+            dk   = _last_digit_key(node_code)
+            tmpl = re.sub(r"\d+", "#", nd)
+            key  = dk + "|" + tmpl
             if key not in groups:
                 groups[key] = []
-            groups[key].append(sub_code)
+            groups[key].append(node_code)
 
-        # Collect all common and exception codes across all groups
-        all_common_codes: list[str] = []
-        all_exception_codes: list[str] = []
+        all_optional_codes: list[str] = []
 
         for key, codes in groups.items():
-            codes_sorted = sorted(codes)
-            for c in codes_sorted:
-                if len(sub_instances[prefix].get(c, set())) == total:
-                    all_common_codes.append(c)
-                else:
-                    all_exception_codes.append(c)
-
-        # Build common Subsystems — grouped by desc template, merged where possible
-        for key, codes in groups.items():
-            common_codes = [
+            static_codes   = [
                 c for c in sorted(codes)
-                if len(sub_instances[prefix].get(c, set())) == total
+                if len(node_instances[prefix].get(c, set())) == total
             ]
-            if common_codes:
-                system.subsystems.append(Subsystem(
-                    code=_build_range_code(common_codes),
-                    description=_build_range_desc(common_codes, sub_desc[prefix]),
-                    is_common=True,
-                    raw_codes=common_codes,
-                    raw_descriptions={c: sub_desc[prefix].get(c, "") for c in common_codes},
+            optional_codes = [c for c in sorted(codes) if c not in static_codes]
+            all_optional_codes.extend(optional_codes)
+
+            if static_codes:
+                section.nodes.append(Node(
+                    code=_build_range_code(static_codes),
+                    description=_build_range_desc(static_codes, node_desc_map[prefix]),
+                    is_static=True,
+                    raw_codes=static_codes,
+                    raw_descriptions={c: node_desc_map[prefix].get(c, "") for c in static_codes},
+                    raw_present_in={},
                     present_in=list(f0_instances),
                 ))
 
-        # Merge consecutive common Subsystems with same text tokens
-        # and one varying number (any position)
-        system.subsystems = _merge_common_subsystems(system.subsystems)
+        section.nodes = _merge_static_nodes(section.nodes)
 
-        # All exception codes → single OPTIONAL Subsystem with real description
-        if all_exception_codes:
-            all_exception_codes_sorted = sorted(all_exception_codes)
+        if all_optional_codes:
+            all_optional_sorted = sorted(all_optional_codes)
             present: set[str] = set()
             raw_pres: dict[str, list[str]] = {}
-            for c in all_exception_codes_sorted:
-                inst = sub_instances[prefix].get(c, set())
+            for c in all_optional_sorted:
+                inst = node_instances[prefix].get(c, set())
                 present |= inst
                 raw_pres[c] = sorted(inst)
-            system.subsystems.append(Subsystem(
-                code=_build_range_code(all_exception_codes_sorted),
-                description=_build_range_desc(all_exception_codes_sorted, sub_desc[prefix]),
-                is_common=False,
-                raw_codes=all_exception_codes_sorted,
-                raw_descriptions={c: sub_desc[prefix].get(c, "") for c in all_exception_codes_sorted},
+            section.nodes.append(Node(
+                code=_build_range_code(all_optional_sorted),
+                description=_build_range_desc(all_optional_sorted, node_desc_map[prefix]),
+                is_static=False,
+                raw_codes=all_optional_sorted,
+                raw_descriptions={c: node_desc_map[prefix].get(c, "") for c in all_optional_sorted},
                 raw_present_in=raw_pres,
                 present_in=sorted(present),
             ))
 
-        if system.subsystems:
-            result.append(system)
+        if section.nodes:
+            result.append(section)
 
     return result
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Code / description helpers
+# Helpers
 # ═════════════════════════════════════════════════════════════════════════════
 
 
 def _last_digit_key(code: str) -> str:
-    """
-    Return the code with last digit replaced by '#'.
-    ACA11 → 'ACA1#',  MQA01 → 'MQA0#',  BFA10 → 'BFA1#'
-    """
     m = re.match(r"^([A-Za-z]+\d*)(\d)$", code)
     if m:
         return m.group(1) + "#"
@@ -406,10 +347,6 @@ def _last_digit_key(code: str) -> str:
 
 
 def _build_range_code(codes: list[str]) -> str:
-    """
-    Single code → '=ACA01'
-    Multiple    → '=ACA11..19'
-    """
     if not codes:
         return ""
     s = sorted(codes)
@@ -419,11 +356,6 @@ def _build_range_code(codes: list[str]) -> str:
 
 
 def _build_range_desc(codes: list[str], desc_map: dict[str, str]) -> str:
-    """
-    Build display description for a group of codes.
-    Numbers that differ across descriptions → shown as first..last range.
-    Numbers that are the same → kept as-is.
-    """
     descs = [desc_map.get(c, "") for c in sorted(codes)]
     if not descs:
         return ""
@@ -438,15 +370,14 @@ def _build_range_desc(codes: list[str], desc_map: dict[str, str]) -> str:
         return descs[0]
 
     first_tokens = tokenised[0]
-    last_tokens = tokenised[-1]
+    last_tokens  = tokenised[-1]
     result = []
     for i, token in enumerate(first_tokens):
         all_values = [t[i] for t in tokenised]
         if i % 2 == 1:
             result.append(
                 f"{first_tokens[i]}..{last_tokens[i]}"
-                if len(set(all_values)) > 1
-                else token
+                if len(set(all_values)) > 1 else token
             )
         else:
             result.append(token)
@@ -454,10 +385,6 @@ def _build_range_desc(codes: list[str], desc_map: dict[str, str]) -> str:
 
 
 def _group_instances_ranges(instances: list[str]) -> str:
-    """
-    Compress sorted instance list into compact range string.
-    ['G001','G002','G003','G005'] → 'G001..G003, G005'
-    """
     if not instances:
         return ""
 
@@ -496,27 +423,8 @@ def _group_instances_ranges(instances: list[str]) -> str:
     return ", ".join(groups)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Subsystem merging
-# ═════════════════════════════════════════════════════════════════════════════
-
-
-def _merge_common_subsystems(subsystems: list[Subsystem]) -> list[Subsystem]:
-    """
-    Merge consecutive common Subsystems that share identical text tokens
-    and have exactly one varying numeric token in the last position.
-
-    Examples that DO merge:
-      MQA01..09 "System 1..9"  +  MQA10..19 "System 10..19"  → MQA01..19 "System 1..19"
-
-    Examples that do NOT merge:
-      ACA10..19 "Busbar System 1, ..."  +  ACA20..29 "Busbar System 2, ..."
-      → kept separate (varying number is not in last position)
-
-      AXC10 "Main Lighting"  +  AXC20 "Outdoor Lighting"
-      → kept separate (text tokens differ)
-    """
-    if not subsystems:
+def _merge_static_nodes(nodes: list[Node]) -> list[Node]:
+    if not nodes:
         return []
 
     def tokenise(s: str) -> list[str]:
@@ -526,42 +434,37 @@ def _merge_common_subsystems(subsystems: list[Subsystem]) -> list[Subsystem]:
         parts = tokenise(desc)
         return tuple(parts[i] for i in range(0, len(parts), 2))
 
-    merged: list[Subsystem] = []
+    merged: list[Node] = []
     i = 0
-    while i < len(subsystems):
-        sub = subsystems[i]
+    while i < len(nodes):
+        node = nodes[i]
 
-        if not sub.is_common:
-            merged.append(sub)
+        if not node.is_static:
+            merged.append(node)
             i += 1
             continue
 
-        # Build a run of common Subsystems with same text tokens
-        run = [sub]
-        base_text = text_tokens(sub.description)
+        run        = [node]
+        base_text  = text_tokens(node.description)
         j = i + 1
-        while j < len(subsystems) and subsystems[j].is_common:
-            if text_tokens(subsystems[j].description) == base_text:
-                run.append(subsystems[j])
+        while j < len(nodes) and nodes[j].is_static:
+            if text_tokens(nodes[j].description) == base_text:
+                run.append(nodes[j])
                 j += 1
             else:
                 break
 
         if len(run) == 1:
-            merged.append(sub)
+            merged.append(node)
             i = j
             continue
 
-        # Merge if exactly one numeric token varies (any position)
-        parts_first = tokenise(run[0].description)
-        parts_last = tokenise(run[-1].description)
+        parts_first  = tokenise(run[0].description)
+        parts_last   = tokenise(run[-1].description)
         do_merge = False
         if len(parts_first) == len(parts_last):
-            num_indices = [k for k in range(len(parts_first)) if k % 2 == 1]
-            diff_indices = [
-                k for k in num_indices
-                if parts_first[k] != parts_last[k]
-            ]
+            num_indices  = [k for k in range(len(parts_first)) if k % 2 == 1]
+            diff_indices = [k for k in num_indices if parts_first[k] != parts_last[k]]
             if len(diff_indices) == 1:
                 do_merge = True
 
@@ -571,22 +474,22 @@ def _merge_common_subsystems(subsystems: list[Subsystem]) -> list[Subsystem]:
             i = j
             continue
 
-        # Merge the run
-        all_codes = sorted(c for r in run for c in r.raw_codes)
+        all_codes     = sorted(c for r in run for c in r.raw_codes)
         all_raw_descs = {}
         for r in run:
             all_raw_descs.update(r.raw_descriptions)
+
         combined_code = _build_range_code(all_codes)
         combined_desc = _collapse_desc_ranges(run[0].description, run[-1].description)
 
-        merged.append(Subsystem(
+        merged.append(Node(
             code=combined_code,
             description=combined_desc,
-            is_common=True,
+            is_static=True,
             raw_codes=all_codes,
             raw_descriptions=all_raw_descs,
             raw_present_in={},
-            present_in=sub.present_in,
+            present_in=node.present_in,
         ))
         i = j
 
@@ -594,10 +497,6 @@ def _merge_common_subsystems(subsystems: list[Subsystem]) -> list[Subsystem]:
 
 
 def _collapse_desc_ranges(first_desc: str, last_desc: str) -> str:
-    """
-    Merge two already-ranged descriptions into one.
-    "System 1..9"  +  "System 10..19"  →  "System 1..19"
-    """
     def tokenise(s: str) -> list[str]:
         return re.split(r"(\d+(?:\.\.\d+)?)", s)
 
@@ -609,59 +508,11 @@ def _collapse_desc_ranges(first_desc: str, last_desc: str) -> str:
     result = []
     for i, (tf, tl) in enumerate(zip(parts_f, parts_l)):
         if i % 2 == 1:
-            fn = re.match(r"(\d+)", tf)
-            ln = re.findall(r"\d+", tl)
+            fn        = re.match(r"(\d+)", tf)
+            ln        = re.findall(r"\d+", tl)
             first_num = fn.group(1) if fn else tf
-            last_num = ln[-1] if ln else tl
+            last_num  = ln[-1] if ln else tl
             result.append(f"{first_num}..{last_num}" if first_num != last_num else first_num)
         else:
             result.append(tf)
     return "".join(result)
-
-
-def _merge_exception_subsystems(
-    subsystems: list[Subsystem],
-    f0_instances: list[str],
-) -> list[Subsystem]:
-    """
-    Merge consecutive exception Subsystems with identical present_in sets
-    into a single Subsystem with combined code range.
-    """
-    if not subsystems:
-        return []
-
-    merged: list[Subsystem] = []
-    i = 0
-    while i < len(subsystems):
-        sub = subsystems[i]
-
-        if sub.is_common:
-            merged.append(sub)
-            i += 1
-            continue
-
-        run = [sub]
-        target = frozenset(sub.present_in)
-        j = i + 1
-        while j < len(subsystems) and not subsystems[j].is_common:
-            if frozenset(subsystems[j].present_in) == target:
-                run.append(subsystems[j])
-                j += 1
-            else:
-                break
-
-        if len(run) == 1:
-            merged.append(sub)
-        else:
-            all_codes = sorted(c for r in run for c in r.raw_codes)
-            merged.append(Subsystem(
-                code=_build_range_code(all_codes),
-                description=run[0].description,
-                is_common=False,
-                raw_codes=all_codes,
-                present_in=sorted(target),
-            ))
-
-        i = j
-
-    return merged

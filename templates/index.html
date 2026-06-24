@@ -13,7 +13,6 @@
     .btn { font-size: 12px; padding: 5px 12px; border-radius: 8px; border: 1px solid #ccc; background: transparent; cursor: pointer; color: #1a1a1a; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: #2C5F8A; color: #fff; border-color: #2C5F8A; }
-    .btn-primary:disabled { background: #2C5F8A; }
 
     .app { display: grid; grid-template-columns: 220px 1fr; height: calc(100vh - 48px); }
 
@@ -38,10 +37,9 @@
     .status.ok { color: #1D9E75; }
     .status.warning { color: #854F0B; }
 
-    .warnings-panel { background: #FFFBF0; border-bottom: 1px solid #FAC775; padding: 0; flex-shrink: 0; }
+    .warnings-panel { background: #FFFBF0; border-bottom: 1px solid #FAC775; flex-shrink: 0; }
     .warnings-header { display: flex; align-items: center; gap: 8px; padding: 7px 14px; cursor: pointer; user-select: none; }
     .warnings-header:hover { background: #FEF6E4; }
-    .warnings-icon { font-size: 13px; }
     .warnings-title { font-size: 12px; font-weight: 500; color: #854F0B; }
     .warnings-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #FAC775; color: #854F0B; }
     .warnings-toggle { margin-left: auto; font-size: 11px; color: #854F0B; opacity: 0.6; }
@@ -50,14 +48,12 @@
     .warning-item { display: flex; gap: 8px; font-size: 11px; color: #6B4000; padding: 3px 0; border-bottom: 1px solid #FDE8B0; line-height: 1.5; }
     .warning-item:last-child { border-bottom: none; }
     .warnings-dismiss { font-size: 11px; color: #854F0B; background: none; border: none; cursor: pointer; margin-left: auto; opacity: 0.6; padding: 4px 0 0; }
-    .warnings-dismiss:hover { opacity: 1; }
 
     .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: #aaa; font-size: 13px; }
 
     .panel { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
     .panel-toolbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid #e5e5e5; flex-shrink: 0; }
     .panel-toolbar-title { font-size: 13px; font-weight: 500; font-family: monospace; }
-    .panel-toolbar-desc { font-size: 12px; color: #666; }
     .panel-body { overflow-y: auto; flex: 1; }
 
     .system-block { border-bottom: 1px solid #e5e5e5; }
@@ -72,28 +68,17 @@
     table.sub-table tr.sub-row:hover td { background: #f9f9f7; }
 
     .sub-code { font-family: monospace; font-size: 11px; background: #f0f0ee; padding: 2px 6px; border-radius: 4px; display: inline-block; }
-    .sub-code.exception { background: #FEF6EC; color: #854F0B; }
-    .cov-bar { display: inline-block; width: 40px; height: 5px; background: #e5e5e5; border-radius: 3px; vertical-align: middle; margin-right: 5px; overflow: hidden; }
-    .cov-fill { height: 100%; border-radius: 3px; }
-    .cov-full { background: #1D9E75; }
-    .cov-part { background: #EF9F27; }
+    .sub-code.optional { background: #FEF6EC; color: #854F0B; }
     .tag { font-size: 10px; padding: 1px 5px; border-radius: 4px; }
-    .tag-common { background: #EAF3DE; color: #3B6D11; }
+    .tag-static { background: #EAF3DE; color: #3B6D11; }
     .tag-exc { background: #FAEEDA; color: #854F0B; }
 
     .ungroup-label { font-size: 10px; color: #999; cursor: pointer; user-select: none; }
     .ungroup-label.active { color: #2C5F8A; font-weight: 500; }
-
-    .expand-btn { font-size: 11px; color: #2C5F8A; cursor: pointer; background: none; border: none; padding: 0; display: flex; align-items: center; gap: 4px; }
+    .expand-btn { font-size: 11px; color: #2C5F8A; cursor: pointer; background: none; border: none; padding: 0; }
     .expand-btn:hover { text-decoration: underline; }
 
-    .raw-list { background: #fafaf8; }
     .raw-list td { padding: 0 !important; border-bottom: none !important; }
-    .raw-inner { padding: 4px 14px 4px 48px; border-bottom: 1px solid #f0f0f0; }
-    table.raw-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    table.raw-table td { padding: 3px 8px; border-bottom: 1px solid #f5f5f3; color: #555; }
-    table.raw-table td:first-child { font-family: monospace; color: #2C5F8A; width: 100px; white-space: nowrap; }
-    table.raw-table tr:last-child td { border-bottom: none; }
 
     /* ── Column Mapper Modal ── */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
@@ -108,14 +93,13 @@
     .mapper-table th { text-align: left; font-size: 11px; font-weight: 500; color: #999; padding: 6px 8px; border-bottom: 1px solid #e5e5e5; }
     .mapper-table td { padding: 7px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
     .mapper-table tr:hover td { background: #f9f9f7; }
-    .col-name { font-family: monospace; font-size: 11px; font-weight: 500; color: #1a1a1a; }
-    .col-examples { font-size: 11px; color: #888; }
+    .col-name { font-family: monospace; font-size: 11px; font-weight: 500; }
     .col-example-val { display: inline-block; background: #f0f0ee; padding: 1px 5px; border-radius: 3px; margin-right: 3px; font-family: monospace; font-size: 10px; }
-    .role-select { font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ddd; background: #fff; color: #1a1a1a; cursor: pointer; width: 140px; }
+    .role-select { font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; width: 180px; }
     .role-select:focus { outline: none; border-color: #2C5F8A; }
-    .role-select.assigned-root { border-color: #2C5F8A; background: #EAF3FB; color: #185FA5; font-weight: 500; }
-    .role-select.assigned-level1 { border-color: #1D9E75; background: #EAF3DE; color: #1D5C3A; font-weight: 500; }
-    .role-select.assigned-desc { border-color: #854F0B; background: #FAEEDA; color: #854F0B; font-weight: 500; }
+    .role-select.assigned-main   { border-color: #2C5F8A; background: #EAF3FB; color: #185FA5; font-weight: 500; }
+    .role-select.assigned-system { border-color: #1D9E75; background: #EAF3DE; color: #1D5C3A; font-weight: 500; }
+    .role-select.assigned-desc   { border-color: #854F0B; background: #FAEEDA; color: #854F0B; font-weight: 500; }
 
     .mapper-hint { font-size: 11px; color: #666; background: #f5f5f3; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; line-height: 1.6; }
     .mapper-validation { font-size: 11px; color: #c0392b; padding: 6px 0; display: none; }
@@ -141,8 +125,8 @@
     </div>
     <div class="modal-body">
       <div class="mapper-hint">
-        Assign <strong>Root</strong>, <strong>Level 1</strong> and <strong>Description</strong> to the correct columns.
-        All other columns will be ignored. Level 1 headers (letters only) are detected automatically.
+        Assign <strong>Main System</strong>, <strong>System / Subsystem</strong> and <strong>Description</strong> to the correct columns.
+        System headers (letters only, e.g. MQA) and Subsystems (letters+digits, e.g. MQA01) are detected automatically from the same column.
       </div>
       <div class="mapper-validation" id="mapper-validation"></div>
       <table class="mapper-table">
@@ -150,7 +134,7 @@
           <tr>
             <th style="width:200px">Column</th>
             <th>Examples</th>
-            <th style="width:150px">Role</th>
+            <th style="width:190px">Role</th>
           </tr>
         </thead>
         <tbody id="mapper-tbody"></tbody>
@@ -182,7 +166,7 @@
 
     <div class="warnings-panel" id="warnings-panel" style="display:none">
       <div class="warnings-header" onclick="toggleWarnings()">
-        <span class="warnings-icon">⚠️</span>
+        <span style="font-size:13px">⚠️</span>
         <span class="warnings-title">Warnings</span>
         <span class="warnings-badge" id="warnings-count">0</span>
         <span class="warnings-toggle" id="warnings-toggle">▼ show</span>
@@ -209,10 +193,10 @@
     warningsOpen: true,
     columnMap: {},
     pendingFile: null,
-    pendingWarnings: [],
+    columns: [],
   };
 
-  const area = document.getElementById('upload-area');
+  const area     = document.getElementById('upload-area');
   const fileInput = document.getElementById('fileInput');
 
   area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('dragover'); });
@@ -230,22 +214,15 @@
     const form = new FormData();
     form.append('file', file);
 
-    const res = await fetch('/upload', { method: 'POST', body: form });
+    const res  = await fetch('/upload', { method: 'POST', body: form });
     const data = await res.json();
-
-    if (!data.ok) {
-      setStatus(data.errors.map(e => `✗ ${e}`).join('\n'), 'error');
-      return;
-    }
+    if (!data.ok) { setStatus(data.error || 'Upload failed', 'error'); return; }
 
     state.pendingFile = file;
-    state.pendingWarnings = data.warnings || [];
-
-    // Fetch columns and show mapper
     setStatus('Reading columns...');
-    const colRes = await fetch('/columns', { method: 'POST' });
-    const colData = await colRes.json();
 
+    const colRes  = await fetch('/columns', { method: 'POST' });
+    const colData = await colRes.json();
     if (colData.error) { setStatus(colData.error, 'error'); return; }
 
     setStatus('');
@@ -257,33 +234,34 @@
   function showMapper(columns) {
     state.columns = columns;
     const tbody = document.getElementById('mapper-tbody');
-    const roles = ['— ignore —', 'Root', 'Level 1', 'Description'];
+    const roles  = ['— ignore —', 'Main System', 'System / Subsystem', 'Description'];
 
-    // Auto-detect roles based on column name keywords
+    const usedRoles = new Set();
     function autoRole(name) {
       const n = name.toLowerCase();
-      if (n.includes('f0')) return 'Root';
-      if (n.includes('f1')) return 'Level 1';
-      if (n.includes('description') || n.includes('desc')) return 'Description';
+      const candidates = [];
+      if (n.includes('f0') && !n.includes('f1') && !n.includes('f2')) candidates.push('Main System');
+      if (n.includes('f1') && !n.includes('f0') && !n.includes('f2')) candidates.push('System / Subsystem');
+      if (n.includes('description') || n.includes('desc')) candidates.push('Description');
+      for (const r of candidates) {
+        if (!usedRoles.has(r)) { usedRoles.add(r); return r; }
+      }
       return '— ignore —';
     }
 
     tbody.innerHTML = columns.map((col, i) => {
-      const role = autoRole(col.name);
-      const examples = col.examples.map(e =>
-        `<span class="col-example-val">${e}</span>`
-      ).join('');
-      const roleClass = role === 'Root' ? 'assigned-root'
-        : role === 'Level 1' ? 'assigned-level1'
-        : role === 'Description' ? 'assigned-desc' : '';
-
-      const options = roles.map(r =>
+      const role      = autoRole(col.name);
+      const examples  = col.examples.map(e => `<span class="col-example-val">${e}</span>`).join('');
+      const roleClass = role === 'Main System'        ? 'assigned-main'
+                      : role === 'System / Subsystem' ? 'assigned-system'
+                      : role === 'Description'        ? 'assigned-desc' : '';
+      const options   = roles.map(r =>
         `<option value="${r}" ${r === role ? 'selected' : ''}>${r}</option>`
       ).join('');
 
       return `<tr>
         <td><span class="col-name">${col.name}</span></td>
-        <td><span class="col-examples">${examples}</span></td>
+        <td><span style="color:#888;font-size:11px">${examples}</span></td>
         <td>
           <select class="role-select ${roleClass}" data-col="${col.name}"
             onchange="onRoleChange(this)">
@@ -300,14 +278,12 @@
   function onRoleChange(sel) {
     const role = sel.value;
     sel.className = 'role-select ' + (
-      role === 'Root' ? 'assigned-root' :
-      role === 'Level 1' ? 'assigned-level1' :
-      role === 'Description' ? 'assigned-desc' : ''
+      role === 'Main System'        ? 'assigned-main' :
+      role === 'System / Subsystem' ? 'assigned-system' :
+      role === 'Description'        ? 'assigned-desc' : ''
     );
-
-    // Ensure only one column per role (except ignore)
     if (role !== '— ignore —') {
-      document.querySelectorAll(`.role-select`).forEach(s => {
+      document.querySelectorAll('.role-select').forEach(s => {
         if (s !== sel && s.value === role) {
           s.value = '— ignore —';
           s.className = 'role-select';
@@ -324,39 +300,34 @@
   async function confirmMapper() {
     const selects = document.querySelectorAll('.role-select');
     const map = {};
-    selects.forEach(s => {
-      if (s.value !== '— ignore —') {
-        map[s.value] = s.dataset.col;
-      }
-    });
+    selects.forEach(s => { if (s.value !== '— ignore —') map[s.value] = s.dataset.col; });
 
     const validation = document.getElementById('mapper-validation');
 
-    // 1. Validate required roles are assigned
-    const missing = ['Root', 'Level 1', 'Description'].filter(r => !map[r]);
+    // 1. Required roles
+    const missing = ['Main System', 'System / Subsystem', 'Description'].filter(r => !map[r]);
     if (missing.length > 0) {
       validation.innerHTML = `Please assign: <strong>${missing.join(', ')}</strong>`;
       validation.style.display = 'block';
       return;
     }
 
-    // 2. Validate column formats against example values
+    // 2. Format check
     const colExamples = {};
-    (state.columns || []).forEach(c => colExamples[c.name] = c.examples);
-
-    const rootExamples   = colExamples[map['Root']]    || [];
-    const level1Examples = colExamples[map['Level 1']] || [];
+    state.columns.forEach(c => colExamples[c.name] = c.examples);
+    const rootExamples   = colExamples[map['Main System']] || [];
+    const level1Examples = colExamples[map['System / Subsystem']] || [];
     const descExamples   = colExamples[map['Description']] || [];
 
-    const rootOk = rootExamples.some(v => /^[A-Za-z]+[\dn]+$/.test(v.trim()));
+    const rootOk   = rootExamples.some(v => /^=?[A-Za-z]+[\dn]+$/.test(v.trim()));
     const level1Ok = level1Examples.some(v =>
       /^[A-Za-z]{2,5}$/.test(v.trim()) || /^[A-Za-z]{2,3}\d{2}$/.test(v.trim())
     );
-    const descOk = descExamples.some(v => v.trim().length > 0);
+    const descOk   = descExamples.some(v => v.trim().length > 0);
 
     const formatErrors = [];
-    if (!rootOk)   formatErrors.push(`"${map['Root']}" doesn't look like a Root column — expected values like G001, T001`);
-    if (!level1Ok) formatErrors.push(`"${map['Level 1']}" doesn't look like a Level 1 column — expected values like AHA or AHA10`);
+    if (!rootOk)   formatErrors.push(`"${map['Main System']}" doesn't look like a Main System column — expected values like G001, T001`);
+    if (!level1Ok) formatErrors.push(`"${map['System / Subsystem']}" doesn't look like a System/Subsystem column — expected values like MQA or MQA10`);
     if (!descOk)   formatErrors.push(`"${map['Description']}" appears to be empty`);
 
     if (formatErrors.length > 0) {
@@ -369,21 +340,25 @@
     state.columnMap = map;
     document.getElementById('mapper-modal').style.display = 'none';
 
-    // Now parse
     setStatus('Parsing...');
-    const parseRes = await fetch('/parse', {
+    const parseRes  = await fetch('/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ column_map: map }),
     });
     const parseData = await parseRes.json();
 
-    if (parseData.error) { setStatus(parseData.error, 'error'); return; }
+    if (!parseRes.ok) {
+      const errors = (parseData.errors || ['Parse failed']).map(e => `✗ ${e}`).join('\n');
+      setStatus(errors, 'error');
+      document.getElementById('mapper-modal').style.display = 'flex';
+      return;
+    }
 
     state.mainSystems = parseData.main_systems;
-    state.ungroup = {};
-    state.expanded = {};
-    state.warnings = state.pendingWarnings;
+    state.ungroup     = {};
+    state.expanded    = {};
+    state.warnings    = parseData.warnings || [];
     state.warningsOpen = true;
 
     renderSidebar(state.pendingFile.name);
@@ -394,20 +369,19 @@
   // ── Warnings ───────────────────────────────────────────────────────────
 
   function renderWarnings() {
-    const panel = document.getElementById('warnings-panel');
-    const list = document.getElementById('warnings-list');
-    const count = document.getElementById('warnings-count');
+    const panel  = document.getElementById('warnings-panel');
+    const list   = document.getElementById('warnings-list');
+    const count  = document.getElementById('warnings-count');
     const toggle = document.getElementById('warnings-toggle');
-    const body = document.getElementById('warnings-body');
+    const body   = document.getElementById('warnings-body');
 
     if (!state.warnings.length) { panel.style.display = 'none'; return; }
 
     panel.style.display = '';
-    count.textContent = state.warnings.length;
-    list.innerHTML = state.warnings.map(w =>
+    count.textContent   = state.warnings.length;
+    list.innerHTML      = state.warnings.map(w =>
       `<div class="warning-item"><span>⚠</span><span>${w}</span></div>`
     ).join('');
-
     body.classList.toggle('open', state.warningsOpen);
     toggle.textContent = state.warningsOpen ? '▲ hide' : '▼ show';
   }
@@ -427,12 +401,11 @@
   function renderSidebar(filename) {
     document.getElementById('upload-wrap').style.display = 'none';
     document.getElementById('placeholder').style.display = 'flex';
-    document.getElementById('topbar-file').textContent = filename;
+    document.getElementById('topbar-file').textContent   = filename;
     document.getElementById('topbar-file').style.display = '';
     document.getElementById('btn-generate').style.display = '';
 
-    const list = document.getElementById('ms-list');
-    list.innerHTML = state.mainSystems.map((ms, i) => `
+    document.getElementById('ms-list').innerHTML = state.mainSystems.map((ms, i) => `
       <div class="ms-item" onclick="selectMainSystem(${i})" id="ms-${i}">
         <span class="ms-code">${ms.code}</span>
         <span class="ms-badge">${ms.count}</span>
@@ -453,45 +426,38 @@
     if (old) old.remove();
 
     const panel = document.createElement('div');
-    panel.id = 'main-panel';
+    panel.id    = 'main-panel';
     panel.className = 'panel';
     panel.innerHTML = `
       <div class="panel-toolbar">
         <span class="panel-toolbar-title">${ms.code}</span>
         <span style="font-size:12px;color:#666">${ms.description}</span>
         <span style="margin-left:auto;font-size:11px;color:#999">
-          ${ms.count} instance${ms.count > 1 ? 's' : ''} &nbsp;·&nbsp; ${ms.systems.length} systems
+          ${ms.count} instance${ms.count > 1 ? 's' : ''} &nbsp;·&nbsp; ${ms.sections.length} systems
         </span>
       </div>
       <div class="panel-body">
-        ${ms.systems.map((sys, si) => renderSystemBlock(sys, si, ms.count, msIdx)).join('')}
+        ${ms.sections.map((sec, si) => renderSystemBlock(sec, si, ms.count, msIdx)).join('')}
       </div>
     `;
     document.getElementById('main').appendChild(panel);
   }
 
-  function renderSystemBlock(sys, si, total, msIdx) {
-    const commonCount = sys.subsystems.filter(s => s.is_common).length;
-    const excCount = sys.subsystems.length - commonCount;
+  function renderSystemBlock(sec, si, total, msIdx) {
+    const staticCount   = sec.nodes.filter(n => n.is_static).length;
+    const optionalCount = sec.nodes.length - staticCount;
 
-    const rows = sys.subsystems.map((sub, subIdx) => {
-      const pct = total > 0 ? Math.round(sub.present_in.length / total * 100) : 100;
-      const isFull = sub.is_common;
-      const codeClass = isFull ? 'sub-code' : 'sub-code exception';
-      const tag = isFull
-        ? '<span class="tag tag-common">common</span>'
+    const rows = sec.nodes.map((node, nodeIdx) => {
+      const isFull    = node.is_static;
+      const codeClass = isFull ? 'sub-code' : 'sub-code optional';
+      const tag       = isFull
+        ? '<span class="tag tag-static">STATIC</span>'
         : '<span class="tag tag-exc">OPTIONAL</span>';
 
-      const ungroupKey = `${msIdx}|${sys.prefix}|${subIdx}`;
+      const ungroupKey  = `${msIdx}|${sec.prefix}|${nodeIdx}`;
       const isUngrouped = !!state.ungroup[ungroupKey];
-      const isExpanded = !!state.expanded[ungroupKey];
-      const rawCount = sub.raw_codes.length;
-
-      const expandBtn = rawCount > 1
-        ? `<button class="expand-btn" onclick="toggleExpand('${ungroupKey}')">
-             ${isExpanded ? `▼ hide (${rawCount})` : `▶ show (${rawCount})`}
-           </button>`
-        : `<span style="font-size:11px;color:#ccc">—</span>`;
+      const isExpanded  = !!state.expanded[ungroupKey];
+      const rawCount    = node.raw_codes.length;
 
       const ungroupCell = rawCount > 1
         ? `<label style="display:flex;align-items:center;gap:4px;cursor:pointer">
@@ -501,30 +467,33 @@
            </label>`
         : '';
 
+      const expandBtn = rawCount > 1
+        ? `<button class="expand-btn" onclick="toggleExpand('${ungroupKey}')">
+             ${isExpanded ? `▼ hide (${rawCount})` : `▶ show (${rawCount})`}
+           </button>`
+        : `<span style="font-size:11px;color:#ccc">—</span>`;
+
       const rawRows = rawCount > 1
         ? `<tr class="raw-list" id="raw-${ungroupKey.replace(/\|/g,'_')}"
               style="${isExpanded ? '' : 'display:none'}">
-             <td colspan="6" style="padding:0 !important;border-bottom:none !important;">
+             <td colspan="5" style="padding:0 !important;border-bottom:none !important;">
                <table class="sub-table" style="background:#fafaf8">
-                 ${sub.raw_codes.map(c => {
-                   const rawDesc = sub.raw_descriptions[c] || '';
-                   const rawPresent = (sub.raw_present_in && sub.raw_present_in[c])
-                     ? sub.raw_present_in[c] : sub.present_in;
-                   const rawPresentCount = rawPresent.length;
-                   const isRawCommon = rawPresentCount === total;
-                   const rawPct = total > 0 ? Math.round(rawPresentCount / total * 100) : 100;
-                   const rawTag = isRawCommon
-                     ? '<span class="tag tag-common">common</span>'
+                 ${node.raw_codes.map(c => {
+                   const rawPresent = (node.raw_present_in && node.raw_present_in[c])
+                     ? node.raw_present_in[c] : node.present_in;
+                   const rawCount2  = rawPresent.length;
+                   const isStatic   = rawCount2 === total;
+                   const rawTag     = isStatic
+                     ? '<span class="tag tag-static">STATIC</span>'
                      : '<span class="tag tag-exc">OPTIONAL</span>';
                    return `<tr style="background:#fafaf8">
                      <td style="width:90px"></td>
                      <td style="width:130px;padding-left:28px">
                        <span class="sub-code" style="font-size:11px">=${c}</span>
                      </td>
-                     <td style="color:#555;max-width:260px">${rawDesc}</td>
-                     <td style="width:110px"><span style="font-size:11px;color:${isRawCommon ? '#1D9E75' : '#854F0B'}">${rawPresentCount}/${total}</span></td>
+                     <td style="color:#555">${node.raw_descriptions[c] || ''}</td>
+                     <td style="width:90px"><span style="font-size:11px;color:${isStatic ? '#1D9E75' : '#854F0B'}">${rawCount2}/${total}</span></td>
                      <td style="width:80px">${rawTag}</td>
-                     <td style="width:90px"></td>
                    </tr>`;
                  }).join('')}
                </table>
@@ -534,12 +503,12 @@
 
       return `
         <tr class="sub-row">
-          <td>${ungroupCell}</td>
-          <td><span class="${codeClass}">${sub.code}</span></td>
-          <td style="color:#555;max-width:260px">${sub.description}</td>
-          <td><span style="font-size:11px;color:#999">${sub.present_in.length}/${total}</span></td>
-          <td>${tag}</td>
-          <td>${expandBtn}</td>
+          <td style="width:90px">${ungroupCell}</td>
+          <td style="width:130px"><span class="${codeClass}">${node.code}</span></td>
+          <td style="color:#555">${node.description}</td>
+          <td style="width:90px"><span style="font-size:11px;color:#999">${node.present_in.length}/${total}</span></td>
+          <td style="width:80px">${tag}</td>
+          <td style="width:90px">${expandBtn}</td>
         </tr>
         ${rawRows}
       `;
@@ -548,10 +517,10 @@
     return `
       <div class="system-block">
         <div class="system-header">
-          <span class="system-code">=${sys.prefix}</span>
-          <span class="system-desc">${sys.description}</span>
+          <span class="system-code">=${sec.prefix}</span>
+          <span class="system-desc">${sec.description}</span>
           <span class="system-count">
-            ${commonCount} common${excCount > 0 ? ` · ${excCount} optional` : ''}
+            ${staticCount} static${optionalCount > 0 ? ` · ${optionalCount} optional` : ''}
           </span>
         </div>
         <table class="sub-table">
@@ -560,7 +529,7 @@
               <th style="width:90px"></th>
               <th style="width:130px">Code</th>
               <th>Description</th>
-              <th style="width:110px">Coverage</th>
+              <th style="width:90px">Coverage</th>
               <th style="width:80px">Status</th>
               <th style="width:90px">Raw codes</th>
             </tr>
@@ -588,25 +557,25 @@
     const btn = document.querySelector(`button[onclick="toggleExpand('${key}')"]`);
     if (row) row.style.display = state.expanded[key] ? '' : 'none';
     if (btn) {
-      const sub = findSubByKey(key);
+      const sub   = findSubByKey(key);
       const count = sub ? sub.raw_codes.length : '?';
       btn.textContent = state.expanded[key] ? `▼ hide (${count})` : `▶ show (${count})`;
     }
   }
 
   function findSubByKey(key) {
-    const [msIdx, prefix, subIdx] = key.split('|');
-    const ms = state.mainSystems[parseInt(msIdx)];
+    const [msIdx, prefix, nodeIdx] = key.split('|');
+    const ms  = state.mainSystems[parseInt(msIdx)];
     if (!ms) return null;
-    const sys = ms.systems.find(s => s.prefix === prefix);
-    if (!sys) return null;
-    return sys.subsystems[parseInt(subIdx)] || null;
+    const sec = ms.sections.find(s => s.prefix === prefix);
+    if (!sec) return null;
+    return sec.nodes[parseInt(nodeIdx)] || null;
   }
 
   async function generatePdf() {
     const btn = document.getElementById('btn-generate');
     btn.textContent = 'Generating...';
-    btn.disabled = true;
+    btn.disabled    = true;
 
     try {
       const res = await fetch('/generate', {
@@ -620,28 +589,29 @@
         return;
       }
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      const ts   = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
       a.download = `structure_tree_${ts}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } finally {
       btn.textContent = 'Generate PDF';
-      btn.disabled = false;
+      btn.disabled    = false;
     }
   }
 
   function resetUpload() {
-    state = { mainSystems: [], active: null, ungroup: {}, expanded: {}, warnings: [], warningsOpen: true, columnMap: {}, pendingFile: null, pendingWarnings: [] };
-    document.getElementById('upload-wrap').style.display = '';
-    document.getElementById('placeholder').style.display = 'none';
-    document.getElementById('topbar-file').style.display = 'none';
+    state = { mainSystems: [], active: null, ungroup: {}, expanded: {},
+              warnings: [], warningsOpen: true, columnMap: {}, pendingFile: null, columns: [] };
+    document.getElementById('upload-wrap').style.display  = '';
+    document.getElementById('placeholder').style.display  = 'none';
+    document.getElementById('topbar-file').style.display  = 'none';
     document.getElementById('btn-generate').style.display = 'none';
     document.getElementById('warnings-panel').style.display = 'none';
     document.getElementById('ms-list').innerHTML = '';
-    document.getElementById('fileInput').value = '';
+    document.getElementById('fileInput').value   = '';
     const old = document.getElementById('main-panel');
     if (old) old.remove();
     setStatus('');
@@ -650,9 +620,8 @@
   function setStatus(msg, type = '') {
     const el = document.getElementById('status');
     el.textContent = msg;
-    el.className = 'status ' + type;
+    el.className   = 'status ' + type;
   }
 </script>
-
 </body>
 </html>

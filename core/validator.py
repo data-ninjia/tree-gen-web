@@ -7,11 +7,6 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Result types
-# ═════════════════════════════════════════════════════════════════════════════
-
-
 @dataclass
 class ValidationResult:
     errors:   list[str] = field(default_factory=list)
@@ -36,12 +31,10 @@ class ValidationResult:
         return "\n".join(lines)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Public API
-# ═════════════════════════════════════════════════════════════════════════════
-
-
-def validate(excel_path: str) -> ValidationResult:
+def validate(
+    excel_path: str,
+    column_map: dict[str, str] | None = None,
+) -> ValidationResult:
     result = ValidationResult()
 
     try:
@@ -56,23 +49,34 @@ def validate(excel_path: str) -> ValidationResult:
     )
 
     # ── 1. Required columns ───────────────────────────────────────────────
-    f0_col   = _find_col(df, ["F0 ANNN", "F0"])
-    f1_col   = _find_col(df, ["F1 AAANN", "F1"])
-    desc_col = _find_col(df, ["RDS-PP Code Description", "Description"])
+    if column_map:
+        f0_col   = column_map.get("Main System")
+        f1_col   = column_map.get("System / Subsystem")
+        desc_col = column_map.get("Description")
+        if not f0_col:
+            result.errors.append("Column map is missing 'Main System' role.")
+        if not f1_col:
+            result.errors.append("Column map is missing 'System / Subsystem' role.")
+        if not desc_col:
+            result.errors.append("Column map is missing 'Description' role.")
+    else:
+        f0_col   = _find_col(df, ["F0 ANNN", "F0"])
+        f1_col   = _find_col(df, ["F1 AAANN", "F1"])
+        desc_col = _find_col(df, ["Code Description", "Description"])
 
-    if not f0_col:
-        result.errors.append(
-            "Missing F0 column. Expected a column containing 'F0 ANNN' or 'F0'."
-        )
-    if not f1_col:
-        result.errors.append(
-            "Missing F1 column. Expected a column containing 'F1 AAANN' or 'F1'."
-        )
-    if not desc_col:
-        result.errors.append(
-            "Missing Description column. "
-            "Expected a column containing 'RDS-PP Code Description' or 'Description'."
-        )
+        if not f0_col:
+            result.errors.append(
+                "Missing Main System column. Expected a column containing 'F0 ANNN' or 'F0'."
+            )
+        if not f1_col:
+            result.errors.append(
+                "Missing System/Subsystem column. Expected a column containing 'F1 AAANN' or 'F1'."
+            )
+        if not desc_col:
+            result.errors.append(
+                "Missing Description column. "
+                "Expected a column containing 'Code Description' or 'Description'."
+            )
 
     if not result.ok:
         return result
@@ -80,17 +84,17 @@ def validate(excel_path: str) -> ValidationResult:
     # ── 2. At least one data row ──────────────────────────────────────────
     data_rows = df[df[f0_col] != ""]
     if data_rows.empty:
-        result.errors.append("F0 column is empty — no data found.")
+        result.errors.append("Main System column is empty — no data found.")
         return result
 
     # ── 3. F0 format ──────────────────────────────────────────────────────
     bad_f0 = [
         v for v in df[f0_col].unique()
-        if v and not re.match(r"^[A-Za-z]+[\dn]+$", v)
+        if v and not re.match(r"^=?[A-Za-z]+[\dn]+$", v)
     ]
     if bad_f0:
         result.errors.append(
-            f"Invalid F0 values (expected letters+digits, e.g. G001 or G00n): "
+            f"Invalid Main System values (expected letters+digits, e.g. G001 or G00n): "
             f"{', '.join(sorted(bad_f0)[:10])}"
             + (" …" if len(bad_f0) > 10 else "")
         )
@@ -108,8 +112,8 @@ def validate(excel_path: str) -> ValidationResult:
 
     if bad_f1:
         result.errors.append(
-            f"Invalid F1 values (expected 2-5 letters OR letters+2digits, "
-            f"e.g. AHA or AHA10): "
+            f"Invalid System/Subsystem values (expected 2-5 letters OR letters+2digits, "
+            f"e.g. MQA or MQA10): "
             f"{', '.join(sorted(bad_f1)[:10])}"
             + (" …" if len(bad_f1) > 10 else "")
         )
@@ -119,7 +123,6 @@ def validate(excel_path: str) -> ValidationResult:
 
     # ── 6. Description length — warning at 60 chars, one per row ─────────
     DESC_MAX_LEN = 60
-
     for idx, row in df.iterrows():
         desc = row[desc_col]
         if not desc or len(desc) <= DESC_MAX_LEN:
@@ -132,25 +135,24 @@ def validate(excel_path: str) -> ValidationResult:
         )
 
     # ── 7. F0 description rows ────────────────────────────────────────────
-    f0_values = set(df[f0_col].unique()) - {""}
+    f0_values    = set(df[f0_col].unique()) - {""}
     f0_with_desc = set(
         df[(df[f0_col] != "") & (df[f1_col] == "") & (df[desc_col] != "")][f0_col]
     )
     missing_desc = f0_values - f0_with_desc
     if missing_desc:
         result.warnings.append(
-            f"{len(missing_desc)} F0 code(s) have no description row "
-            f"(row where F1 is empty): "
+            f"{len(missing_desc)} Main System code(s) have no description row: "
             f"{', '.join(sorted(missing_desc)[:10])}"
             + (" …" if len(missing_desc) > 10 else "")
         )
 
-    # ── 8. Empty descriptions on leaf rows ────────────────────────────────
+    # ── 8. Empty descriptions on leaf rows ───────────────────────────────
     leaf_rows = df[
         df[f1_col].str.match(r"^[A-Za-z]{2,3}\d{2}$") & (df[f1_col] != "")
     ]
     first_per_leaf = leaf_rows.drop_duplicates(subset=[f0_col, f1_col], keep="first")
-    empty_title = first_per_leaf[first_per_leaf[desc_col] == ""]
+    empty_title    = first_per_leaf[first_per_leaf[desc_col] == ""]
     if not empty_title.empty:
         examples = (
             empty_title[[f0_col, f1_col]].head(5)
@@ -158,17 +160,12 @@ def validate(excel_path: str) -> ValidationResult:
             .tolist()
         )
         result.warnings.append(
-            f"{len(empty_title)} leaf code(s) have no description on their first row: "
+            f"{len(empty_title)} subsystem code(s) have no description: "
             f"{', '.join(examples)}"
             + (" …" if len(empty_title) > 5 else "")
         )
 
     return result
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# Helpers
-# ═════════════════════════════════════════════════════════════════════════════
 
 
 def _find_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
@@ -185,14 +182,6 @@ def _check_orphan_leaves(
     f1_col: str,
     result: ValidationResult,
 ) -> None:
-    """
-    Two-level orphan check:
-
-    1. ERROR — leaf prefix has no header anywhere in the file.
-    2. WARNING — leaf exists in an F0 instance where its header is missing
-       (header exists elsewhere but not in THIS instance → leaf will be
-       skipped for that instance during parsing).
-    """
     # Build per-instance header sets
     instance_headers: dict[str, set[str]] = {}
     for _, row in df.iterrows():
@@ -205,7 +194,7 @@ def _check_orphan_leaves(
 
     all_headers: set[str] = set(h for hs in instance_headers.values() for h in hs)
 
-    # 1. ERROR: prefix has no header anywhere in the file
+    # ERROR: prefix has no header anywhere
     orphan_prefixes: set[str] = set()
     for f1 in df[f1_col].unique():
         if not f1:
@@ -217,12 +206,12 @@ def _check_orphan_leaves(
 
     if orphan_prefixes:
         result.errors.append(
-            f"Leaf code prefix(es) have no section header row anywhere in the file: "
+            f"Subsystem prefix(es) have no System header anywhere in the file: "
             f"{', '.join(sorted(orphan_prefixes))}. "
-            f"Add a letters-only row (e.g. 'AHA') before the first leaf of each section."
+            f"Add a letters-only row (e.g. 'MQA') before the first subsystem of each system."
         )
 
-    # 2. WARNING: leaf exists in instance where its header is missing
+    # WARNING: leaf exists in instance where its header is missing
     skipped: list[str] = []
     seen: set[str] = set()
     for _, row in df.iterrows():
@@ -242,8 +231,8 @@ def _check_orphan_leaves(
 
     if skipped:
         result.warnings.append(
-            f"{len(skipped)} leaf code(s) will be skipped — "
-            f"their section header is missing in that F0 instance: "
+            f"{len(skipped)} subsystem code(s) will be skipped — "
+            f"their system header is missing in that Main System instance: "
             f"{', '.join(skipped[:10])}"
             + (" …" if len(skipped) > 10 else "")
         )

@@ -3,14 +3,13 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class Subsystem:
+class Node:
     """
-    A group of F1 codes (letters + digits) sharing the same description
-    template, differing only in their last digit (e.g. ACA11..19).
+    Subsystem node — F1 leaf code (e.g. MQA01, AHA10).
     """
     code: str
     description: str
-    is_common: bool
+    is_static: bool
     raw_codes: list[str] = field(default_factory=list)
     raw_descriptions: dict[str, str] = field(default_factory=dict)
     raw_present_in: dict[str, list[str]] = field(default_factory=dict)
@@ -18,24 +17,24 @@ class Subsystem:
 
 
 @dataclass
-class System:
+class Section:
     """
-    F1 section header (letters only, e.g. AHA, MDA).
-    Groups related Subsystems together.
+    System header — F1 letters-only code (e.g. MQA, MSE).
+    Groups related Nodes.
     """
     prefix: str
     label: str
     description: str = ""
-    subsystems: list[Subsystem] = field(default_factory=list)
+    nodes: list[Node] = field(default_factory=list)
 
 
 @dataclass
-class MainSystem:
+class RootNode:
     """
-    Top-level F0 group (e.g. =G00n, =T001).
+    Main System — F0 group (e.g. =G00n, =T001).
     """
     code: str
     description: str
     instances: list[str]
     count: int
-    systems: list[System] = field(default_factory=list)
+    sections: list[Section] = field(default_factory=list)
