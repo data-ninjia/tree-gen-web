@@ -82,23 +82,23 @@ Your `.xlsx` file must contain at least 3 columns:
 
 ### Key rules
 
-- **System headers** — letters only, 2–5 chars (e.g. `MQA`, `MSE`) — group title rows
-- **Subsystems** — letters + exactly 2 digits (e.g. `MQA01`) — individual items
+- **System headers** — letters only, 3 chars (e.g. `MQA`, `MSE`) — group title rows
+- **Subsystems** — 3 letters + exactly 2 digits (e.g. `MQA01`) — individual items
 - Each installation must have a description row (Main System filled, System/Subsystem empty)
 - Each installation must have the System header row before its subsystems
 
 ### Example structure
 
 ```
-G001 |        | Photovoltaic Field 1
-G001 | MQA    | Photovoltaic Generator System
-G001 | MQA01  | Photovoltaic Generator System 1
-G001 | MQA02  | Photovoltaic Generator System 2
-G001 | MSE    | Inverter System
-G001 | MSE01  | Inverter System 1
-G002 |        | Photovoltaic Field 2
-G002 | MQA    | Photovoltaic Generator System
-G002 | MQA01  | Photovoltaic Generator System 1
+=G001 |        | Photovoltaic Field 1
+=G001 | MQA    | Photovoltaic Generator System
+=G001 | MQA01  | Photovoltaic Generator System 1
+=G001 | MQA02  | Photovoltaic Generator System 2
+=G001 | MSE    | Inverter System
+=G001 | MSE01  | Inverter System 1
+=G002 |        | Photovoltaic Field 2
+=G002 | MQA    | Photovoltaic Generator System
+=G002 | MQA01  | Photovoltaic Generator System 1
 ```
 
 Column names don't matter — you map them in the UI.
