@@ -151,10 +151,10 @@ It is **OPTIONAL** if it appears in only some — these get an asterisk `*` in t
 Edit `config.py` to customize:
 
 ```python
-DEFAULT_TITLE    = "RDS-PP Structure"   # PDF title on overview page
-DEFAULT_SUBTITLE = ""                   # Optional subtitle
-LOGO_PATH        = "assets/logo.png"   # Company logo (leave file out to skip)
-LOGO_WIDTH       = 60                  # Logo width in points
+DEFAULT_TITLE     = "RDS-PP Structure"   # PDF title on overview page
+DEFAULT_SUBTITLE  = ""                   # Optional subtitle
+LOGO_PATH         = "assets/logo.png"   # Company logo (leave file out to skip)
+LOGO_WIDTH        = 60                  # Logo width in points
 MAX_COLS_PER_PAGE = 6                  # Max system columns per tree page
 ```
 
